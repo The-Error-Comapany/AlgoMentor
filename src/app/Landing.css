@@ -1,0 +1,76 @@
+/* Landing page wrapper */
+.landing-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card */
+.landing-card {
+  background-color: #ffffff;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+/* Title */
+.landing-title {
+  font-size: 1.8rem;
+  margin-bottom: 0.5rem;
+  color: #111827;
+}
+
+/* Subtitle */
+.landing-subtitle {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 2rem;
+}
+
+/* Buttons */
+.landing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.landing-actions button {
+  padding: 12px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background-color: #4f46e5;
+  color: white;
+}
+
+.landing-actions button:hover {
+  background-color: #4338ca;
+}
+
+/* Secondary button */
+.landing-actions .secondary {
+  background-color: #e5e7eb;
+  color: #111827;
+}
+
+.landing-actions .secondary:hover {
+  background-color: #d1d5db;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

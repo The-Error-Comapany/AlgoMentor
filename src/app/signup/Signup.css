@@ -1,0 +1,45 @@
+/* Signup card customizations */
+.signup-card {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+/* Title */
+.signup-title {
+  margin-bottom: 1.2rem;
+  color: #1f2937;
+}
+
+/* Form spacing */
+.signup-form input {
+  margin-bottom: 14px;
+}
+
+/* Footer text */
+.signup-footer {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
+  color: #555;
+}
+
+.signup-footer span {
+  color: #4f46e5;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.signup-footer span:hover {
+  text-decoration: underline;
+}
+
+/* Simple animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
