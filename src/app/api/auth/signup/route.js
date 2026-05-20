@@ -9,7 +9,6 @@ export async function POST(req) {
     await connectDB();
     const { name, email, password } = await req.json();
 
-    // Validate input
     if (!name || !email || !password) {
       return NextResponse.json(
         { success: false, message: "All fields are required" },
@@ -17,10 +16,7 @@ export async function POST(req) {
       );
     }
 
-    // Convert email to lowercase to prevent case sensitivity issues
     const normalizedEmail = email.toLowerCase();
-
-    // Check if user exists
     const userExists = await User.findOne({ email: normalizedEmail });
 
     const otp = generateOTP();
@@ -46,15 +42,13 @@ export async function POST(req) {
         );
       }
 
-      // If user exists but is unverified, update their details and send a new OTP
       userExists.name = name;
-      userExists.password = password; // pre-save hook in User model will automatically re-hash this
+      userExists.password = password;
       userExists.otp = otp;
       userExists.otpExpires = otpExpires;
       await userExists.save();
       user = userExists;
     } else {
-      // Create a new user
       user = await User.create({
         name,
         email: normalizedEmail,
@@ -65,7 +59,6 @@ export async function POST(req) {
       });
     }
 
-    // Send OTP email
     await sendEmail({
       to: user.email,
       subject: "Verify your email",
