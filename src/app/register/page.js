@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login as loginApi } from "@/services/authService";
+import { signup as signupApi } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
-import { KeyRound, Mail, Brain } from "lucide-react";
-import "./Login.css";
+import { KeyRound, Mail, User, Brain } from "lucide-react";
+import "../login/Login.css";
 
-export default function Login() {
+export default function Register() {
   const [form, setForm] = useState({
+    name: "",
     email: "",
     password: "",
   });
@@ -31,12 +32,13 @@ export default function Login() {
     setErrorMsg(null);
 
     try {
-      const res = await loginApi(form);
+      const res = await signupApi(form);
+      // Directly log in on signup success
       login(res.accessToken || "demo-token-active-session");
       router.push("/dashboard");
     } catch (err) {
-      console.warn("Backend login offline, logging in via demo session fallback.", err);
-      // Fallback for seamless experience
+      console.warn("Backend signup offline, registering via demo session fallback.", err);
+      // Fallback for seamless demo experience
       login("demo-token-active-session");
       router.push("/dashboard");
     } finally {
@@ -63,10 +65,10 @@ export default function Login() {
         </div>
 
         <h2 style={{ textAlign: "center", marginBottom: "0.25rem", fontSize: "1.8rem" }}>
-          Welcome Back
+          Create Account
         </h2>
         <p style={{ textAlign: "center", marginBottom: "2rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-          Sharpen your skills with <span style={{ color: "white", fontWeight: "600" }}>Algo Mentor</span>
+          Start tracking and improving with <span style={{ color: "white", fontWeight: "600" }}>Algo Mentor</span>
         </p>
 
         {errorMsg && (
@@ -85,6 +87,19 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div style={{ position: "relative" }}>
+            <User size={16} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+            <input
+              type="text"
+              name="name"
+              placeholder="Enter your full name"
+              value={form.name}
+              onChange={handleChange}
+              style={{ paddingLeft: "2.75rem" }}
+              required
+            />
+          </div>
+
+          <div style={{ position: "relative" }}>
             <Mail size={16} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
             <input
               type="email"
@@ -102,7 +117,7 @@ export default function Login() {
             <input
               type="password"
               name="password"
-              placeholder="Enter your password"
+              placeholder="Create a strong password"
               value={form.password}
               onChange={handleChange}
               style={{ paddingLeft: "2.75rem" }}
@@ -111,17 +126,17 @@ export default function Login() {
           </div>
 
           <button type="submit" className="btn-primary" disabled={loading} style={{ height: "46px", marginTop: "0.5rem", border: "none", borderRadius: "10px", fontWeight: "600", fontSize: "0.95rem" }}>
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Creating Account..." : "Sign Up"}
           </button>
         </form>
 
         <p style={{ textAlign: "center", marginTop: "2rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-          Don't have an account?{" "}
+          Already have an account?{" "}
           <span
-            onClick={() => router.push("/register")}
+            onClick={() => router.push("/login")}
             style={{ color: "var(--primary-light)", cursor: "pointer", fontWeight: "600", marginLeft: "0.25rem" }}
           >
-            Sign up
+            Log in
           </span>
         </p>
       </div>

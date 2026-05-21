@@ -89,30 +89,22 @@ function DashboardLayout({ children }) {
       case "/dashboard": return "Dashboard";
       case "/problems": return "Problem Library";
       case "/contests": return "Contest Calendar";
-      case "/potd": return "Problem of the Day";
       case "/mentor": return "AI Mentor Chat";
       case "/profile": return "Analytics Profile";
       case "/settings": return "User Settings";
-      case "/reminders": return "Contest Reminders";
       case "/analysis": return "Extension Analysis History";
-      case "/recommendations": return "Study Path Recommendations";
       default: return "Algo Mentor";
     }
   };
 
   const menuItems = [
     { name: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
-    { name: "Problems Library", path: "/problems", icon: <Code2 size={18} /> },
-    { name: "Contests Calendar", path: "/contests", icon: <Calendar size={18} /> },
-    { name: "Problem of the Day", path: "/potd", icon: <Flame size={18} /> },
-    { name: "AI Mentor Chat", path: "/mentor", icon: <MessageSquareCode size={18} /> },
-    { name: "Analytics Profile", path: "/profile", icon: <User size={18} /> },
-  ];
-
-  const subMenuItems = [
-    { name: "Study Path", path: "/recommendations", icon: <Compass size={16} /> },
-    { name: "Extension History", path: "/analysis", icon: <History size={16} /> },
-    { name: "Contest Reminders", path: "/reminders", icon: <Clock size={16} /> },
+    { name: "Problems", path: "/problems", icon: <Code2 size={18} /> },
+    { name: "Contests", path: "/contests", icon: <Calendar size={18} /> },
+    { name: "Profile", path: "/profile", icon: <User size={18} /> },
+    { name: "Mentor", path: "/mentor", icon: <MessageSquareCode size={18} /> },
+    { name: "Analysis", path: "/analysis", icon: <History size={16} /> },
+    { name: "Settings", path: "/settings", icon: <Settings size={18} /> }
   ];
 
   const handleNavClick = (path) => {
@@ -157,28 +149,6 @@ function DashboardLayout({ children }) {
               <span>{item.name}</span>
             </div>
           ))}
-
-          <span className="db-nav-section-title" style={{ marginTop: "1rem" }}>Insights & Tools</span>
-          {subMenuItems.map((item) => (
-            <div
-              key={item.name}
-              className={`db-nav-item ${pathname === item.path ? "db-nav-item-active" : ""}`}
-              onClick={() => handleNavClick(item.path)}
-              style={{ fontSize: "0.85rem", padding: "0.6rem 0.75rem" }}
-            >
-              {item.icon}
-              <span>{item.name}</span>
-            </div>
-          ))}
-
-          <span className="db-nav-section-title" style={{ marginTop: "1rem" }}>Support</span>
-          <div
-            className={`db-nav-item ${pathname === "/settings" ? "db-nav-item-active" : ""}`}
-            onClick={() => handleNavClick("/settings")}
-          >
-            <Settings size={18} />
-            <span>Settings</span>
-          </div>
         </nav>
 
         <div className="db-sidebar-footer">
@@ -266,8 +236,8 @@ function DashboardLayout({ children }) {
                     )}
                   </div>
                   <div className="db-notif-footer">
-                    <a href="/reminders" className="db-notif-footer-link" onClick={(e) => { e.preventDefault(); setNotifOpen(false); router.push("/reminders"); }}>
-                      Manage Reminders & Alerts
+                    <a href="/contests" className="db-notif-footer-link" onClick={(e) => { e.preventDefault(); setNotifOpen(false); router.push("/contests"); }}>
+                      View Contest Calendar
                     </a>
                   </div>
                 </div>

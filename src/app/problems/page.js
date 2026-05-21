@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Search, ExternalLink, Sparkles, Filter, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ExternalLink, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 
 const INITIAL_PROBLEMS = [
   { id: 1, title: "Two Sum", platform: "LeetCode", difficulty: "Easy", tags: ["arrays", "hashing"], url: "https://leetcode.com/problems/two-sum/" },
@@ -22,48 +21,29 @@ const INITIAL_PROBLEMS = [
 ];
 
 function ProblemsContent() {
-  const router = useRouter();
-
   // Search & Filter state
   const [search, setSearch] = useState("");
-  const [selectedPlatforms, setSelectedPlatforms] = useState([]);
-  const [selectedDifficulties, setSelectedDifficulties] = useState([]);
-  const [selectedTags, setSelectedTags] = useState([]);
+  const [selectedPlatform, setSelectedPlatform] = useState("All");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("All");
+  const [selectedTag, setSelectedTag] = useState("All");
   const [page, setPage] = useState(1);
   const itemsPerPage = 8;
 
-  // Load tag filter from query param on mount
+  // Load tag filter from query param on mount if clicked from dashboard/elsewhere
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tagParam = params.get("tag");
       if (tagParam) {
-        // Find if the tag is valid in our tag set
-        const normalized = tagParam.toLowerCase();
-        setSelectedTags([normalized]);
+        setSelectedTag(tagParam.toLowerCase());
       }
     }
   }, []);
 
-  const togglePlatform = (p) => {
-    setSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
-    setPage(1);
-  };
-
-  const toggleDifficulty = (d) => {
-    setSelectedDifficulties(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
-    setPage(1);
-  };
-
-  const toggleTag = (t) => {
-    setSelectedTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
-    setPage(1);
-  };
-
   const clearFilters = () => {
-    setSelectedPlatforms([]);
-    setSelectedDifficulties([]);
-    setSelectedTags([]);
+    setSelectedPlatform("All");
+    setSelectedDifficulty("All");
+    setSelectedTag("All");
     setSearch("");
     setPage(1);
   };
@@ -76,17 +56,17 @@ function ProblemsContent() {
                             prob.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
 
       // Platform match
-      const matchesPlatform = selectedPlatforms.length === 0 || selectedPlatforms.includes(prob.platform);
+      const matchesPlatform = selectedPlatform === "All" || prob.platform === selectedPlatform;
 
       // Difficulty match
-      const matchesDifficulty = selectedDifficulties.length === 0 || selectedDifficulties.includes(prob.difficulty);
+      const matchesDifficulty = selectedDifficulty === "All" || prob.difficulty === selectedDifficulty;
 
       // Tag match
-      const matchesTags = selectedTags.length === 0 || selectedTags.every(t => prob.tags.includes(t));
+      const matchesTags = selectedTag === "All" || prob.tags.includes(selectedTag);
 
       return matchesSearch && matchesPlatform && matchesDifficulty && matchesTags;
     });
-  }, [search, selectedPlatforms, selectedDifficulties, selectedTags]);
+  }, [search, selectedPlatform, selectedDifficulty, selectedTag]);
 
   // Paginated slice
   const paginatedProblems = useMemo(() => {
@@ -96,120 +76,123 @@ function ProblemsContent() {
 
   const totalPages = Math.max(1, Math.ceil(filteredProblems.length / itemsPerPage));
 
-  const handleAskAI = (problem) => {
-    // Redirect to AI mentor chat, pre-filling a simulated query
-    router.push(`/mentor?problem=${encodeURIComponent(problem.title)}&platform=${encodeURIComponent(problem.platform)}`);
-  };
-
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "1.5rem" }} className="problems-grid-layout">
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%" }}>
       
-      {/* 1. Left Sidebar Filters */}
-      <div className="glass-card" style={{ height: "fit-content", display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.25rem" }}>
-        <div style={{ display: "flex", justifyBetween: "space-between", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <Filter size={14} style={{ color: "var(--primary-light)" }} />
-            <h3 style={{ fontSize: "0.95rem" }}>Filters</h3>
-          </div>
-          <button onClick={clearFilters} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px", padding: "0" }}>
-            <RefreshCw size={10} />
-            Reset
-          </button>
+      {/* 1. Header Centered Search and Filter Bar */}
+      <div className="glass-card" style={{ 
+        display: "flex", 
+        flexDirection: "column", 
+        alignItems: "center", 
+        gap: "1.25rem", 
+        padding: "2rem",
+        background: "linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.02) 100%)",
+        borderColor: "rgba(255, 255, 255, 0.08)"
+      }}>
+        <div style={{ textAlign: "center", marginBottom: "0.25rem" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "600", marginBottom: "0.5rem" }}>Practice Library</h2>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", margin: "0" }}>
+            Curated list of premium LeetCode and Codeforces coding challenges
+          </p>
         </div>
 
-        {/* Platform section */}
-        <div>
-          <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "700", color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>Platform</span>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {["LeetCode", "Codeforces"].map((p) => (
-              <label key={p} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", cursor: "pointer", color: "var(--text-secondary)" }}>
-                <input
-                  type="checkbox"
-                  checked={selectedPlatforms.includes(p)}
-                  onChange={() => togglePlatform(p)}
-                  style={{ width: "14px", height: "14px", cursor: "pointer" }}
-                />
-                <span>{p}</span>
-              </label>
-            ))}
-          </div>
+        {/* Search input centered */}
+        <div style={{ position: "relative", maxWidth: "560px", width: "100%" }}>
+          <Search size={18} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+          <input
+            type="text"
+            placeholder="Search problems by name or tags..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            style={{ 
+              paddingLeft: "2.75rem", 
+              height: "46px", 
+              backgroundColor: "rgba(8,11,17,0.5)", 
+              borderRadius: "12px", 
+              width: "100%",
+              border: "1px solid var(--border-ice)",
+              fontSize: "0.9rem"
+            }}
+          />
         </div>
 
-        {/* Difficulty section */}
-        <hr style={{ border: "none", borderTop: "1px solid var(--border-ice)" }} />
-        <div>
-          <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "700", color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>Difficulty</span>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {["Easy", "Medium", "Hard", "Div1", "Div2"].map((d) => (
-              <label key={d} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", cursor: "pointer", color: "var(--text-secondary)" }}>
-                <input
-                  type="checkbox"
-                  checked={selectedDifficulties.includes(d)}
-                  onChange={() => toggleDifficulty(d)}
-                  style={{ width: "14px", height: "14px", cursor: "pointer" }}
-                />
-                <span>{d}</span>
-              </label>
-            ))}
+        {/* Dropdowns Row */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1rem", width: "100%", marginTop: "0.25rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", fontWeight: "600", textTransform: "uppercase" }}>Platform</span>
+            <select 
+              value={selectedPlatform} 
+              onChange={(e) => { setSelectedPlatform(e.target.value); setPage(1); }}
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-ice)", color: "white", padding: "0.5rem 1.25rem", borderRadius: "8px", cursor: "pointer", outline: "none", fontSize: "0.85rem", minWidth: "150px" }}
+            >
+              <option value="All" style={{ background: "#0a0d14", color: "white" }}>All Platforms</option>
+              <option value="LeetCode" style={{ background: "#0a0d14", color: "white" }}>LeetCode</option>
+              <option value="Codeforces" style={{ background: "#0a0d14", color: "white" }}>Codeforces</option>
+            </select>
           </div>
-        </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", fontWeight: "600", textTransform: "uppercase" }}>Difficulty</span>
+            <select 
+              value={selectedDifficulty} 
+              onChange={(e) => { setSelectedDifficulty(e.target.value); setPage(1); }}
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-ice)", color: "white", padding: "0.5rem 1.25rem", borderRadius: "8px", cursor: "pointer", outline: "none", fontSize: "0.85rem", minWidth: "150px" }}
+            >
+              <option value="All" style={{ background: "#0a0d14", color: "white" }}>All Difficulties</option>
+              <option value="Easy" style={{ background: "#0a0d14", color: "white" }}>Easy</option>
+              <option value="Medium" style={{ background: "#0a0d14", color: "white" }}>Medium</option>
+              <option value="Hard" style={{ background: "#0a0d14", color: "white" }}>Hard</option>
+              <option value="Div1" style={{ background: "#0a0d14", color: "white" }}>Div1 (CF)</option>
+              <option value="Div2" style={{ background: "#0a0d14", color: "white" }}>Div2 (CF)</option>
+            </select>
+          </div>
 
-        {/* Popular tags section */}
-        <hr style={{ border: "none", borderTop: "1px solid var(--border-ice)" }} />
-        <div>
-          <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "700", color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>Topic Tags</span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {["arrays", "DP", "trees", "strings", "sliding window", "binary search", "graphs"].map((t) => {
-              const active = selectedTags.includes(t);
-              return (
-                <span
-                  key={t}
-                  onClick={() => toggleTag(t)}
-                  style={{
-                    fontSize: "0.65rem",
-                    padding: "0.25rem 0.5rem",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    background: active ? "var(--primary-gradient)" : "rgba(255,255,255,0.04)",
-                    color: active ? "white" : "var(--text-secondary)",
-                    border: `1px solid ${active ? "transparent" : "var(--border-ice)"}`,
-                    transition: "all 0.15s"
-                  }}
-                >
-                  {t}
-                </span>
-              );
-            })}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", fontWeight: "600", textTransform: "uppercase" }}>Topic Tag</span>
+            <select 
+              value={selectedTag} 
+              onChange={(e) => { setSelectedTag(e.target.value); setPage(1); }}
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-ice)", color: "white", padding: "0.5rem 1.25rem", borderRadius: "8px", cursor: "pointer", outline: "none", fontSize: "0.85rem", minWidth: "150px" }}
+            >
+              <option value="All" style={{ background: "#0a0d14", color: "white" }}>All Topics</option>
+              {["arrays", "DP", "trees", "strings", "sliding window", "binary search", "graphs", "constructive", "math", "bitmasks", "two pointers", "queue", "stack", "hashing"].map(t => (
+                <option key={t} value={t} style={{ background: "#0a0d14", color: "white" }}>{t}</option>
+              ))}
+            </select>
           </div>
+          
+          {(search || selectedPlatform !== "All" || selectedDifficulty !== "All" || selectedTag !== "All") && (
+            <button 
+              onClick={clearFilters}
+              style={{ 
+                alignSelf: "flex-end", 
+                height: "38px", 
+                background: "rgba(239, 68, 68, 0.1)", 
+                border: "1px solid rgba(239, 68, 68, 0.2)", 
+                color: "var(--text-danger)", 
+                fontSize: "0.8rem", 
+                borderRadius: "8px", 
+                padding: "0 1rem", 
+                cursor: "pointer", 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "6px",
+                transition: "all 0.2s"
+              }}
+            >
+              <RefreshCw size={12} />
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 2. Main Problems Table area */}
+      {/* 2. Main Problems Table */}
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        
-        {/* Search Header */}
-        <div className="glass-card" style={{ display: "flex", gap: "1rem", padding: "0.85rem 1rem", alignItems: "center" }}>
-          <div style={{ position: "relative", flexGrow: "1" }}>
-            <Search size={16} style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-            <input
-              type="text"
-              placeholder="Search problems by name or tags..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              style={{ paddingLeft: "2.5rem", height: "40px", backgroundColor: "rgba(8,11,17,0.5)" }}
-            />
-          </div>
-          
-          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", flexShrink: "0" }}>
-            Found {filteredProblems.length} results
-          </span>
-        </div>
-
-        {/* Problems Table Grid */}
         <div className="glass-card" style={{ padding: "0", overflow: "hidden" }}>
           {paginatedProblems.length === 0 ? (
-            <div style={{ padding: "3rem", textAlignment: "center", textAlign: "center", color: "var(--text-secondary)" }}>
-              <p style={{ marginBottom: "0.5rem" }}>No problems matched your active filters</p>
+            <div style={{ padding: "4rem 2rem", textAlign: "center", color: "var(--text-secondary)" }}>
+              <p style={{ marginBottom: "1rem" }}>No problems matched your active filters</p>
               <button className="btn btn-secondary btn-sm" onClick={clearFilters}>Clear All Filters</button>
             </div>
           ) : (
@@ -248,28 +231,16 @@ function ProblemsContent() {
                         </div>
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: "8px" }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            style={{ padding: "0.35rem 0.6rem", fontSize: "0.75rem" }}
-                            title="Ask Algo Mentor for review!"
-                            onClick={() => handleAskAI(prob)}
-                          >
-                            <Sparkles size={12} style={{ color: "var(--text-warning)" }} />
-                            <span>Ask AI</span>
-                          </button>
-                          
-                          <a
-                            href={prob.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-primary btn-sm"
-                            style={{ padding: "0.35rem 0.6rem", fontSize: "0.75rem" }}
-                          >
-                            <span>Open</span>
-                            <ExternalLink size={12} />
-                          </a>
-                        </div>
+                        <a
+                          href={prob.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-primary btn-sm"
+                          style={{ padding: "0.4rem 0.8rem", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                        >
+                          <span>Open</span>
+                          <ExternalLink size={12} />
+                        </a>
                       </td>
                     </tr>
                   ))}
@@ -318,17 +289,7 @@ function ProblemsContent() {
             </div>
           </div>
         )}
-
       </div>
-
-      <style jsx global>{`
-        @media (max-width: 768px) {
-          .problems-grid-layout {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
-
     </div>
   );
 }
