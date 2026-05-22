@@ -35,6 +35,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    lcHandle: {
+      type: String,
+      default: "",
+    },
+    cfHandle: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

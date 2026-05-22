@@ -5,18 +5,39 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Calendar as CalendarIcon, Clock, Bell, ExternalLink, Sparkles, X } from "lucide-react";
 
-const INITIAL_CONTESTS = [
-  { id: "cf1", name: "Codeforces Round 998 (Div 2)", platform: "Codeforces", start: "2026-05-21T13:30:00Z", duration: "120 mins", link: "https://codeforces.com/contests", dateDay: 21 },
-  { id: "lc1", name: "LeetCode Weekly Contest 432", platform: "LeetCode", start: "2026-05-23T02:30:00Z", duration: "90 mins", link: "https://leetcode.com/contest/", dateDay: 23 },
-  { id: "cf2", name: "Codeforces Educational Round 165", platform: "Codeforces", start: "2026-05-27T14:35:00Z", duration: "120 mins", link: "https://codeforces.com/contests", dateDay: 27 },
-  { id: "lc2", name: "LeetCode Biweekly Contest 129", platform: "LeetCode", start: "2026-05-30T14:30:00Z", duration: "90 mins", link: "https://leetcode.com/contest/", dateDay: 30 },
-  { id: "cf3", name: "Codeforces Round 999 (Div 1 + Div 2)", platform: "Codeforces", start: "2026-06-03T13:30:00Z", duration: "150 mins", link: "https://codeforces.com/contests", dateDay: 3 }
-];
-
 function ContestsContent() {
+  const [contests, setContests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [reminders, setReminders] = useState([]);
   const [now, setNow] = useState(new Date());
   const [activeModalContests, setActiveModalContests] = useState(null); // Contests to show in detail modal
+
+  // Fetch contests on mount
+  useEffect(() => {
+    const fetchContests = async () => {
+      try {
+        const res = await fetch("/api/contests");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const mapped = data.map((c) => ({
+            id: c._id || c.slug,
+            name: c.name,
+            platform: c.platform === "leetcode" ? "LeetCode" : "Codeforces",
+            start: c.startTime,
+            duration: `${Math.round(c.duration / 60)} mins`,
+            link: c.url,
+            dateDay: new Date(c.startTime).getDate()
+          }));
+          setContests(mapped);
+        }
+      } catch (err) {
+        console.error("Error fetching contests:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContests();
+  }, []);
 
   // Load reminders on mount
   useEffect(() => {
@@ -72,27 +93,29 @@ function ContestsContent() {
     return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  // Calendar parameters (May 2026)
-  const monthName = "May 2026";
-  const daysInMonth = 31;
-  const startDayOfWeek = 5; // May 1st 2026 is a Friday (index 5)
+  // Calendar parameters based on current date
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const startDayOfWeek = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+  const monthName = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const calendarDays = [];
 
   // Empty slots for preceding month
   for (let i = 0; i < startDayOfWeek; i++) {
     calendarDays.push(null);
   }
-  // Days of May
+  // Days of current month
   for (let i = 1; i <= daysInMonth; i++) {
     calendarDays.push(i);
   }
 
-  // Group contests by day in May for calendar cells
+  // Group contests by day in current month for calendar cells
   const getContestsForDay = (day) => {
     if (!day) return [];
-    return INITIAL_CONTESTS.filter(c => {
+    return contests.filter(c => {
       const cDate = new Date(c.start);
-      return cDate.getMonth() === 4 && cDate.getDate() === day; // May (month index 4)
+      return cDate.getFullYear() === now.getFullYear() &&
+             cDate.getMonth() === now.getMonth() &&
+             cDate.getDate() === day;
     });
   };
 
@@ -122,65 +145,75 @@ function ContestsContent() {
         </h3>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }} className="contests-list-grid">
-          {INITIAL_CONTESTS.map((c) => {
-            const isRem = reminders.some(r => r.id === c.id);
-            const formattedDate = new Date(c.start).toLocaleDateString("en-US", {
-              weekday: "long", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
-            });
+          {loading ? (
+            <div style={{ gridColumn: "span 2", padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
+              Loading upcoming contests...
+            </div>
+          ) : contests.length === 0 ? (
+            <div style={{ gridColumn: "span 2", padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
+              No upcoming contests found in database.
+            </div>
+          ) : (
+            contests.slice(0, 4).map((c) => {
+              const isRem = reminders.some(r => r.id === c.id);
+              const formattedDate = new Date(c.start).toLocaleDateString("en-US", {
+                weekday: "long", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+              });
 
-            return (
-              <div
-                key={c.id}
-                className="glass-card"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1rem",
-                  borderLeft: `4px solid ${c.platform === "LeetCode" ? "#ffa116" : "#318dec"}`,
-                  background: "linear-gradient(to right, rgba(255,255,255,0.01), transparent)",
-                  padding: "1.25rem"
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <span className={`badge ${c.platform === "LeetCode" ? "badge-leetcode" : "badge-codeforces"}`}>
-                      {c.platform}
-                    </span>
-                    <h4 style={{ fontSize: "1rem", margin: "8px 0 4px", fontWeight: "600" }}>{c.name}</h4>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "4px", margin: "0" }}>
-                      <Clock size={12} />
-                      {formattedDate} (Local)
-                    </p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: "4px 0 0" }}>
-                      Duration: {c.duration}
-                    </p>
+              return (
+                <div
+                  key={c.id}
+                  className="glass-card"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1rem",
+                    borderLeft: `4px solid ${c.platform === "LeetCode" ? "#ffa116" : "#318dec"}`,
+                    background: "linear-gradient(to right, rgba(255,255,255,0.01), transparent)",
+                    padding: "1.25rem"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <span className={`badge ${c.platform === "LeetCode" ? "badge-leetcode" : "badge-codeforces"}`}>
+                        {c.platform}
+                      </span>
+                      <h4 style={{ fontSize: "1rem", margin: "8px 0 4px", fontWeight: "600" }}>{c.name}</h4>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "4px", margin: "0" }}>
+                        <Clock size={12} />
+                        {formattedDate} (Local)
+                      </p>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: "4px 0 0" }}>
+                        Duration: {c.duration}
+                      </p>
+                    </div>
+
+                    <a href={c.link} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ padding: "0.35rem 0.5rem" }}>
+                      <ExternalLink size={12} />
+                    </a>
                   </div>
 
-                  <a href={c.link} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ padding: "0.35rem 0.5rem" }}>
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto", borderTop: "1px solid var(--border-ice)", paddingTop: "0.75rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)" }}>Starting In</span>
+                      <span style={{ fontSize: "0.85rem", fontWeight: "600", fontFamily: "var(--font-mono)", color: "var(--text-warning)" }}>
+                        {getCountdown(c.start)}
+                      </span>
+                    </div>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto", borderTop: "1px solid var(--border-ice)", paddingTop: "0.75rem" }}>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)" }}>Starting In</span>
-                    <span style={{ fontSize: "0.85rem", fontWeight: "600", fontFamily: "var(--font-mono)", color: "var(--text-warning)" }}>
-                      {getCountdown(c.start)}
-                    </span>
+                    <button
+                      onClick={() => toggleReminder(c)}
+                      className={`btn btn-sm ${isRem ? "btn-primary" : "btn-secondary"}`}
+                      style={{ padding: "0.4rem 0.75rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <Bell size={12} />
+                      <span>{isRem ? "Alert Enabled" : "Set Reminder"}</span>
+                    </button>
                   </div>
-
-                  <button
-                    onClick={() => toggleReminder(c)}
-                    className={`btn btn-sm ${isRem ? "btn-primary" : "btn-secondary"}`}
-                    style={{ padding: "0.4rem 0.75rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}
-                  >
-                    <Bell size={12} />
-                    <span>{isRem ? "Alert Enabled" : "Set Reminder"}</span>
-                  </button>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -207,7 +240,7 @@ function ContestsContent() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px", minHeight: "340px" }}>
           {calendarDays.map((day, idx) => {
             const dayContests = getContestsForDay(day);
-            const isToday = day === 21; // Mock current date is May 21st 2026
+            const isToday = day === now.getDate();
             const hasContest = dayContests.length > 0;
 
             return (

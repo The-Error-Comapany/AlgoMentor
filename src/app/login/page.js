@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { login as loginApi } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 import { KeyRound, Mail, Brain } from "lucide-react";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
 import "./Login.css";
 
 export default function Login() {
@@ -32,13 +33,19 @@ export default function Login() {
 
     try {
       const res = await loginApi(form);
-      login(res.accessToken || "demo-token-active-session");
-      router.push("/dashboard");
+      if (res.success && res.accessToken) {
+        login(res.accessToken);
+        router.push("/dashboard");
+      } else {
+        setErrorMsg(res.message || "Invalid credentials.");
+      }
     } catch (err) {
-      console.warn("Backend login offline, logging in via demo session fallback.", err);
-      // Fallback for seamless experience
-      login("demo-token-active-session");
-      router.push("/dashboard");
+      console.error("Login error:", err);
+      setErrorMsg(
+        err.response?.data?.message || 
+        err.message || 
+        "Failed to connect to authentication server."
+      );
     } finally {
       setLoading(false);
     }
@@ -114,6 +121,14 @@ export default function Login() {
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
+
+        <div style={{ display: "flex", alignItems: "center", margin: "1.5rem 0", color: "var(--text-muted)" }}>
+          <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255,255,255,0.08)" }} />
+          <span style={{ padding: "0 0.75rem", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)" }}>or continue with</span>
+          <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255,255,255,0.08)" }} />
+        </div>
+
+        <GoogleLoginButton width={376} />
 
         <p style={{ textAlign: "center", marginTop: "2rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
           Don't have an account?{" "}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/context/AuthContext";
 import {
   Award,
   Flame,
@@ -21,74 +22,219 @@ import {
 
 function DashboardContent() {
   const router = useRouter();
-  const [userName, setUserName] = useState("Aishvary");
+  const { user, loading: loadingUser } = useAuth();
+  
+  // Sync data states
+  const [stats, setStats] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [potd, setPotd] = useState(null);
+  const [contests, setContests] = useState([]);
+  
+  // Timers and interactive states
+  const [timeNow, setTimeNow] = useState(null);
+  const [reminders, setReminders] = useState({ cf: false, lc: false });
 
-  // Load registered name if any from settings/profile
+  // Initialize timeNow on client
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedName = localStorage.getItem("userName");
-      if (storedName) {
-        setUserName(storedName);
-      }
-    }
-  }, []);
-
-  // Mock contest reminder states for LC & CF
-  const [reminders, setReminders] = useState({
-    cf: false,
-    lc: false
-  });
-
-  // Contest countdowns (in seconds, simulated)
-  const [countdowns, setCountdowns] = useState({
-    cf: 7200 + 45 * 60, // 2h 45m
-    lc: 86400 * 2 + 14400 // 2 days 4 hours
-  });
-
-  // Countdown timer effect
-  useEffect(() => {
+    setTimeNow(new Date());
     const timer = setInterval(() => {
-      setCountdowns((prev) => ({
-        cf: prev.cf > 0 ? prev.cf - 1 : 7200,
-        lc: prev.lc > 0 ? prev.lc - 1 : 86400
-      }));
+      setTimeNow(new Date());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const formatCountdown = (seconds) => {
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor((seconds % 86400) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
+  // 2. Fetch User Stats, Submissions, and Topics once we have user ID
+  useEffect(() => {
+    if (!user?._id) return;
+
+    const fetchUserData = async () => {
+      try {
+        // Fetch stats
+        const statsRes = await fetch(`/api/user/stats?userId=${user._id}`);
+        const statsData = await statsRes.json();
+        if (Array.isArray(statsData)) {
+          setStats(statsData);
+        }
+
+        // Fetch submissions
+        const subsRes = await fetch(`/api/user/submissions?userId=${user._id}&limit=50`);
+        const subsData = await subsRes.json();
+        if (Array.isArray(subsData)) {
+          setSubmissions(subsData);
+        }
+
+        // Fetch topics
+        const topicsRes = await fetch(`/api/user/topics?userId=${user._id}`);
+        const topicsData = await topicsRes.json();
+        if (Array.isArray(topicsData)) {
+          setTopics(topicsData);
+        }
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
+
+  // 3. Fetch POTD and contests
+  useEffect(() => {
+    const fetchGlobalData = async () => {
+      try {
+        const potdRes = await fetch("/api/potd");
+        const potdData = await potdRes.json();
+        if (potdData && potdData.title) {
+          setPotd(potdData);
+        }
+
+        const contestsRes = await fetch("/api/contests");
+        const contestsData = await contestsRes.json();
+        if (Array.isArray(contestsData)) {
+          setContests(contestsData);
+        }
+      } catch (err) {
+        console.error("Error fetching global data:", err);
+      }
+    };
+
+    fetchGlobalData();
+  }, []);
+
+  // Helper: Format countdown from startTime
+  const formatCountdown = (startTimeStr) => {
+    if (!startTimeStr || !timeNow) return "00:00:00";
+    const diffSeconds = Math.max(0, Math.floor((new Date(startTimeStr) - timeNow) / 1000));
+    
+    const d = Math.floor(diffSeconds / 86400);
+    const h = Math.floor((diffSeconds % 86400) / 3600);
+    const m = Math.floor((diffSeconds % 3600) / 60);
+    const s = diffSeconds % 60;
     
     if (d > 0) return `${d}d ${h}h ${m}m`;
     return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  // Helper: Relative time formatting for submissions
+  const getRelativeTime = (dateInput) => {
+    const date = new Date(dateInput);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHr / 24);
+
+    if (diffSec < 60) return "Just now";
+    if (diffMin < 60) return `${diffMin} min${diffMin > 1 ? "s" : ""} ago`;
+    if (diffHr < 24) return `${diffHr} hr${diffHr > 1 ? "s" : ""} ago`;
+    if (diffDays === 1) return "Yesterday";
+    return `${diffDays} days ago`;
+  };
+
+  // Helper: Get Problem URL
+  const getProblemUrl = (title, platform, titleSlug) => {
+    return platform === "leetcode"
+      ? `https://leetcode.com/problems/${titleSlug || title.toLowerCase().replace(/ /g, "-")}/`
+      : `https://codeforces.com/problemset/problem/${titleSlug || "1800/A"}`;
+  };
+
+  // Toggle local reminders
   const toggleReminder = (platform) => {
-    setReminders((prev) => {
-      const newVal = !prev[platform];
-      return { ...prev, [platform]: newVal };
-    });
+    setReminders((prev) => ({ ...prev, [platform]: !prev[platform] }));
   };
 
-  // Purely LeetCode POTD
-  const leetCodePotd = {
-    title: "Sliding Window Maximum",
-    difficulty: "Hard",
-    link: "https://leetcode.com/problems/sliding-window-maximum/",
-    tags: ["Queue", "Sliding Window"]
+  // Aggregated Stats Calculations
+  const lcStats = stats.find((s) => s.platform === "leetcode");
+  const cfStats = stats.find((s) => s.platform === "codeforces");
+
+  const totalSolved = (lcStats?.solved || 0) + (cfStats?.solved || 0);
+  const lcRating = lcStats?.rating || null;
+  const cfRating = cfStats?.rating || null;
+  const cfRank = cfStats?.rank || "N/A";
+
+  // Calculate weekly goal progress (accepted submissions in the last 7 days vs target of 10)
+  const last7DaysAccepted = submissions.filter((s) => {
+    if (s.verdict.toLowerCase() !== "accepted" && s.verdict.toLowerCase() !== "ok") return false;
+    const subDate = new Date(s.timestamp);
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    return subDate >= oneWeekAgo;
+  }).length;
+  const weeklyGoalTarget = 10;
+  const weeklyGoalPercent = Math.min(100, Math.round((last7DaysAccepted / weeklyGoalTarget) * 100));
+
+  // Calculate streak from submissions
+  const calculateStreak = (subs) => {
+    if (!subs || subs.length === 0) return 0;
+    
+    // Extract unique dates of accepted submissions in local timezone
+    const solvedDates = new Set(
+      subs
+        .filter(s => s.verdict.toLowerCase() === "accepted" || s.verdict.toLowerCase() === "ok")
+        .map(s => new Date(s.timestamp).toDateString())
+    );
+
+    let streak = 0;
+    let checkDate = new Date();
+    
+    const todayStr = checkDate.toDateString();
+    checkDate.setDate(checkDate.getDate() - 1);
+    const yesterdayStr = checkDate.toDateString();
+    
+    if (!solvedDates.has(todayStr) && !solvedDates.has(yesterdayStr)) {
+      return 0;
+    }
+    
+    checkDate = new Date(); // Reset to today
+    while (true) {
+      const dateStr = checkDate.toDateString();
+      if (solvedDates.has(dateStr)) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        if (dateStr === todayStr) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          continue;
+        }
+        break;
+      }
+    }
+    return streak;
   };
 
-  // Exactly 5 recent submissions across LC and CF only
-  const recentSubmissions = [
-    { title: "Edit Distance", platform: "LeetCode", verdict: "Accepted", lang: "C++", time: "10 mins ago", difficulty: "Hard" },
-    { title: "Divisibility by 2^n", platform: "Codeforces", verdict: "Time Limit Exceeded", lang: "C++", time: "45 mins ago", difficulty: "Medium" },
-    { title: "Binary Tree Maximum Path Sum", platform: "LeetCode", verdict: "Accepted", lang: "Java", time: "3 hours ago", difficulty: "Hard" },
-    { title: "Valid Parentheses", platform: "LeetCode", verdict: "Accepted", lang: "Python", time: "Yesterday", difficulty: "Easy" },
-    { title: "XOR-Construction", platform: "Codeforces", verdict: "Wrong Answer", lang: "C++", time: "2 days ago", difficulty: "Medium" }
-  ];
+  const currentStreak = calculateStreak(submissions);
+
+  // Find next upcoming contests
+  const upcomingLC = contests
+    .filter((c) => c.platform === "leetcode" && new Date(c.startTime) > new Date())
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0];
+
+  const upcomingCF = contests
+    .filter((c) => c.platform === "codeforces" && new Date(c.startTime) > new Date())
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0];
+
+  // Topic diagnostics for AI Recommendation
+  const [recommendation, setRecommendation] = useState("Link your competitive coding handles in Settings to analyze your performance and receive personalized AI recommendations.");
+  
+  useEffect(() => {
+    if (topics.length > 0) {
+      const sortedTopics = [...topics].sort((a, b) => a.count - b.count);
+      const weakTopic = sortedTopics[0]?.topic || "Algorithms";
+      setRecommendation(`Based on your synced solve history, we recommend focusing on ${weakTopic} problems. Improving your mastery in this category will help boost your performance.`);
+    } else if (user?.lcHandle || user?.cfHandle) {
+      setRecommendation("Generating diagnostic recommendations... Run sync in Settings to fetch your topic distributions.");
+    }
+  }, [topics, user]);
+
+  if (loadingUser) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ width: "50px", height: "50px", borderRadius: "50%", border: "4px solid rgba(99, 102, 241, 0.1)", borderTopColor: "var(--primary)", animation: "spin 1s infinite linear" }} />
+        <p style={{ marginTop: "1rem", color: "var(--text-secondary)" }}>Loading dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -97,10 +243,18 @@ function DashboardContent() {
       <div className="glass-card" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1.25rem", background: "linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)", borderColor: "rgba(99, 102, 241, 0.2)" }}>
         <div style={{ flexGrow: "1" }}>
           <h2 style={{ fontSize: "1.6rem", marginBottom: "0.25rem", textAlign: "left" }}>
-            Welcome back, {userName}! 👋
+            Welcome back, {user?.name || "Developer"}! 👋
           </h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: "0" }}>
-            You've solved <span style={{ color: "white", fontWeight: "600" }}>342 problems</span>. Keep pushing to reach your target skill rating! 🚀
+            {user?.lcHandle || user?.cfHandle ? (
+              <>
+                You've solved <span style={{ color: "white", fontWeight: "600" }}>{totalSolved} problems</span> across connected platforms. Keep it up! 🚀
+              </>
+            ) : (
+              <>
+                Get started by linking your <span style={{ color: "var(--primary-light)" }}>LeetCode</span> and <span style={{ color: "var(--text-info)" }}>Codeforces</span> handles in <span style={{ color: "white", cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/settings")}>Settings</span>.
+              </>
+            )}
           </p>
         </div>
         
@@ -108,10 +262,10 @@ function DashboardContent() {
         <div style={{ width: "220px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "4px" }}>
             <span style={{ color: "var(--text-secondary)" }}>Weekly Goal Progress</span>
-            <span style={{ color: "white", fontWeight: "600" }}>85% (17/20)</span>
+            <span style={{ color: "white", fontWeight: "600" }}>{weeklyGoalPercent}% ({last7DaysAccepted}/{weeklyGoalTarget})</span>
           </div>
           <div style={{ height: "6px", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }}>
-            <div style={{ height: "100%", width: "85%", background: "var(--primary-gradient)", borderRadius: "4px", boxShadow: "0 0 10px rgba(99, 102, 241, 0.5)" }} />
+            <div style={{ height: "100%", width: `${weeklyGoalPercent}%`, background: "var(--primary-gradient)", borderRadius: "4px", boxShadow: "0 0 10px rgba(99, 102, 241, 0.5)" }} />
           </div>
         </div>
       </div>
@@ -126,7 +280,7 @@ function DashboardContent() {
           <div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Total Solved</span>
             <h3 style={{ fontSize: "1.4rem", margin: "0" }}>
-              843 <span style={{ fontSize: "0.7rem", color: "var(--text-success)", fontWeight: "500" }}>+12% wk</span>
+              {totalSolved}
             </h3>
           </div>
         </div>
@@ -138,7 +292,7 @@ function DashboardContent() {
           <div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>LeetCode Rating</span>
             <h3 style={{ fontSize: "1.4rem", margin: "0", color: "#ffa116" }}>
-              1942 <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontWeight: "400" }}>Top 4%</span>
+              {lcRating || "Unlinked"}
             </h3>
           </div>
         </div>
@@ -150,19 +304,19 @@ function DashboardContent() {
           <div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Codeforces Rating</span>
             <h3 style={{ fontSize: "1.4rem", margin: "0", color: "#318dec" }}>
-              1684 <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)", fontWeight: "500" }}>Expert</span>
+              {cfRating || "Unlinked"} <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)", fontWeight: "500" }}>{cfRating ? cfRank : ""}</span>
             </h3>
           </div>
         </div>
 
         <div className="glass-card" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "var(--text-danger)", width: "42px", height: "42px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Flame size={20} className="pulse-green" style={{ color: "var(--danger)" }} />
+            <Flame size={20} style={{ color: "var(--danger)" }} />
           </div>
           <div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Current Streak</span>
             <h3 style={{ fontSize: "1.4rem", margin: "0", color: "var(--text-danger)" }}>
-              18 Days <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontWeight: "400" }}>Max 42</span>
+              {currentStreak} Day{currentStreak === 1 ? "" : "s"}
             </h3>
           </div>
         </div>
@@ -186,30 +340,36 @@ function DashboardContent() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <Flame size={18} style={{ color: "#ffa116" }} />
-                <h3 style={{ fontSize: "1.1rem" }}>LeetCode Problem of the Day</h3>
+                <h3 style={{ fontSize: "1.1rem" }}>Problem of the Day</h3>
               </div>
-              <span className="badge badge-leetcode" style={{ fontSize: "0.7rem", padding: "0.2rem 0.6rem" }}>LeetCode Only</span>
+              <span className="badge badge-leetcode" style={{ fontSize: "0.7rem", padding: "0.2rem 0.6rem" }}>LeetCode</span>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.2rem", background: "rgba(8, 11, 17, 0.4)", borderRadius: "12px", border: "1px solid var(--border-ice)" }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "6px" }}>
-                  <span className="badge badge-hard" style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
-                    {leetCodePotd.difficulty}
-                  </span>
-                  {leetCodePotd.tags.map(t => (
-                    <span key={t} style={{ fontSize: "0.7rem", color: "var(--text-secondary)", background: "rgba(255,255,255,0.03)", padding: "0.1rem 0.4rem", borderRadius: "4px" }}>
-                      {t}
+            {potd ? (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.2rem", background: "rgba(8, 11, 17, 0.4)", borderRadius: "12px", border: "1px solid var(--border-ice)" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "6px" }}>
+                    <span className={`badge badge-${potd.difficulty.toLowerCase()}`} style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
+                      {potd.difficulty}
                     </span>
-                  ))}
+                    {(potd.tags || []).slice(0, 3).map(t => (
+                      <span key={t} style={{ fontSize: "0.7rem", color: "var(--text-secondary)", background: "rgba(255,255,255,0.03)", padding: "0.1rem 0.4rem", borderRadius: "4px" }}>
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <h4 style={{ fontSize: "1.1rem", margin: "0", color: "white", fontWeight: "600" }}>{potd.title}</h4>
                 </div>
-                <h4 style={{ fontSize: "1.1rem", margin: "0", color: "white", fontWeight: "600" }}>{leetCodePotd.title}</h4>
+                <a href={potd.url} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>Solve Now</span>
+                  <ExternalLink size={14} />
+                </a>
               </div>
-              <a href={leetCodePotd.link} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>Solve Now</span>
-                <ExternalLink size={14} />
-              </a>
-            </div>
+            ) : (
+              <div style={{ padding: "1.2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                No active challenge fetched. Global sync handles are loading.
+              </div>
+            )}
           </div>
 
           {/* Recent Submissions Feed */}
@@ -219,55 +379,66 @@ function DashboardContent() {
                 <Code2 size={16} style={{ color: "var(--primary-light)" }} />
                 <h3 style={{ fontSize: "1.1rem" }}>Recent Submissions Feed</h3>
               </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }} onClick={() => router.push("/profile")} className="link">Full History</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", cursor: "pointer" }} onClick={() => router.push("/profile")} className="link">Full History</span>
             </div>
 
             <div className="table-container" style={{ border: "none", background: "none" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Platform</th>
-                    <th>Lang</th>
-                    <th>Verdict</th>
-                    <th>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentSubmissions.map((sub, i) => (
-                    <tr key={i}>
-                      <td>
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                          <span style={{ fontSize: "0.85rem", fontWeight: "600" }}>{sub.title}</span>
-                          <span className={`badge ${sub.difficulty === "Hard" ? "badge-hard" : "badge-medium"}`} style={{ fontSize: "0.55rem", padding: "0.1rem 0.35rem", alignSelf: "flex-start", marginTop: "2px" }}>
-                            {sub.difficulty}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`badge ${sub.platform === "LeetCode" ? "badge-leetcode" : "badge-codeforces"}`} style={{ fontSize: "0.65rem" }}>
-                          {sub.platform}
-                        </span>
-                      </td>
-                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>{sub.lang}</td>
-                      <td>
-                        <span style={{
-                          fontSize: "0.75rem",
-                          fontWeight: "600",
-                          color: sub.verdict === "Accepted" ? "var(--text-success)" : sub.verdict === "Wrong Answer" ? "var(--text-danger)" : "var(--text-warning)",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px"
-                        }}>
-                          {sub.verdict === "Accepted" ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                          {sub.verdict}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{sub.time}</td>
+              {submissions.length > 0 ? (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Platform</th>
+                      <th>Lang</th>
+                      <th>Verdict</th>
+                      <th>Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {submissions.slice(0, 5).map((sub, i) => (
+                      <tr key={i}>
+                        <td>
+                          <a 
+                            href={getProblemUrl(sub.title, sub.platform, sub.titleSlug)} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={{ fontSize: "0.85rem", fontWeight: "600", textDecoration: "none", color: "white" }}
+                            className="link-hover"
+                            onMouseOver={(e) => e.currentTarget.style.color = "var(--primary-light)"}
+                            onMouseOut={(e) => e.currentTarget.style.color = "white"}
+                          >
+                            {sub.title}
+                          </a>
+                        </td>
+                        <td>
+                          <span className={`badge ${sub.platform === "leetcode" ? "badge-leetcode" : "badge-codeforces"}`} style={{ fontSize: "0.65rem" }}>
+                            {sub.platform === "leetcode" ? "LeetCode" : "Codeforces"}
+                          </span>
+                        </td>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>{sub.language}</td>
+                        <td>
+                          <span style={{
+                            fontSize: "0.75rem",
+                            fontWeight: "600",
+                            color: (sub.verdict === "Accepted" || sub.verdict === "OK") ? "var(--text-success)" : sub.verdict === "Wrong Answer" ? "var(--text-danger)" : "var(--text-warning)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}>
+                            {(sub.verdict === "Accepted" || sub.verdict === "OK") ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                            {sub.verdict === "OK" ? "Accepted" : sub.verdict}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{getRelativeTime(sub.timestamp)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                  No submissions synced yet. Sync handles in settings to display coding activity.
+                </div>
+              )}
             </div>
           </div>
 
@@ -283,55 +454,68 @@ function DashboardContent() {
                 <Calendar size={16} style={{ color: "var(--primary-light)" }} />
                 <h3 style={{ fontSize: "1.1rem" }}>Upcoming Contests</h3>
               </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }} onClick={() => router.push("/contests")} className="link">Calendar View</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", cursor: "pointer" }} onClick={() => router.push("/contests")} className="link">Calendar View</span>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {/* Contest 1: Codeforces */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", borderRadius: "10px", background: "rgba(49, 141, 236, 0.04)", border: "1px solid rgba(49, 141, 236, 0.1)" }}>
-                <div>
-                  <span className="badge badge-codeforces" style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", marginBottom: "4px" }}>Codeforces</span>
-                  <div style={{ fontSize: "0.85rem", fontWeight: "600" }}>CF Round 998 (Div 2)</div>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>Duration: 2h 00m</span>
+              
+              {/* Codeforces Upcoming */}
+              {upcomingCF ? (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", borderRadius: "10px", background: "rgba(49, 141, 236, 0.04)", border: "1px solid rgba(49, 141, 236, 0.1)" }}>
+                  <div>
+                    <span className="badge badge-codeforces" style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", marginBottom: "4px" }}>Codeforces</span>
+                    <div style={{ fontSize: "0.85rem", fontWeight: "600", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{upcomingCF.name}</div>
+                    <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>Duration: {Math.round(upcomingCF.duration / 3600)}h</span>
+                  </div>
+                  <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-warning)", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Clock size={10} />
+                      {formatCountdown(upcomingCF.startTime)}
+                    </span>
+                    <button
+                      className={`btn btn-sm ${reminders.cf ? "btn-primary" : "btn-secondary"}`}
+                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.65rem" }}
+                      onClick={() => toggleReminder("cf")}
+                    >
+                      <Bell size={10} />
+                      <span>{reminders.cf ? "Reminder Set" : "Set Alert"}</span>
+                    </button>
+                  </div>
                 </div>
-                <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: "4px" }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-warning)", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Clock size={10} />
-                    {formatCountdown(countdowns.cf)}
-                  </span>
-                  <button
-                    className={`btn btn-sm ${reminders.cf ? "btn-primary" : "btn-secondary"}`}
-                    style={{ padding: "0.25rem 0.5rem", fontSize: "0.65rem" }}
-                    onClick={() => toggleReminder("cf")}
-                  >
-                    <Bell size={10} />
-                    <span>{reminders.cf ? "Reminder Set" : "Set Alert"}</span>
-                  </button>
+              ) : (
+                <div style={{ padding: "0.75rem", fontSize: "0.8rem", color: "var(--text-muted)", border: "1px dashed rgba(255,255,255,0.05)", borderRadius: "8px", textAlign: "center" }}>
+                  No upcoming Codeforces contests
                 </div>
-              </div>
+              )}
 
-              {/* Contest 2: LeetCode */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", borderRadius: "10px", background: "rgba(245, 158, 11, 0.04)", border: "1px solid rgba(245, 158, 11, 0.1)" }}>
-                <div>
-                  <span className="badge badge-leetcode" style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", marginBottom: "4px" }}>LeetCode</span>
-                  <div style={{ fontSize: "0.85rem", fontWeight: "600" }}>Weekly Contest 432</div>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>Duration: 1h 30m</span>
+              {/* LeetCode Upcoming */}
+              {upcomingLC ? (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", borderRadius: "10px", background: "rgba(245, 158, 11, 0.04)", border: "1px solid rgba(245, 158, 11, 0.1)" }}>
+                  <div>
+                    <span className="badge badge-leetcode" style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", marginBottom: "4px" }}>LeetCode</span>
+                    <div style={{ fontSize: "0.85rem", fontWeight: "600", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{upcomingLC.name}</div>
+                    <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>Duration: {Math.round(upcomingLC.duration / 3600)}h</span>
+                  </div>
+                  <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Clock size={10} />
+                      {formatCountdown(upcomingLC.startTime)}
+                    </span>
+                    <button
+                      className={`btn btn-sm ${reminders.lc ? "btn-primary" : "btn-secondary"}`}
+                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.65rem" }}
+                      onClick={() => toggleReminder("lc")}
+                    >
+                      <Bell size={10} />
+                      <span>{reminders.lc ? "Reminder Set" : "Set Alert"}</span>
+                    </button>
+                  </div>
                 </div>
-                <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: "4px" }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Clock size={10} />
-                    {formatCountdown(countdowns.lc)}
-                  </span>
-                  <button
-                    className={`btn btn-sm ${reminders.lc ? "btn-primary" : "btn-secondary"}`}
-                    style={{ padding: "0.25rem 0.5rem", fontSize: "0.65rem" }}
-                    onClick={() => toggleReminder("lc")}
-                  >
-                    <Bell size={10} />
-                    <span>{reminders.lc ? "Reminder Set" : "Set Alert"}</span>
-                  </button>
+              ) : (
+                <div style={{ padding: "0.75rem", fontSize: "0.8rem", color: "var(--text-muted)", border: "1px dashed rgba(255,255,255,0.05)", borderRadius: "8px", textAlign: "center" }}>
+                  No upcoming LeetCode contests
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -349,7 +533,7 @@ function DashboardContent() {
             </div>
             
             <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: "0", lineHeight: "1.4" }}>
-              Based on your recent TLE rates on Recursion problems and low rating on Dynamic Programming tags, we recommend practicing <span style={{ color: "white", fontWeight: "600" }}>Sliding Window problems</span>. It will build key state memoization fundamentals.
+              {recommendation}
             </p>
 
             <button
@@ -371,6 +555,9 @@ function DashboardContent() {
           .grid-responsive-two {
             grid-template-columns: 1fr !important;
           }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
 

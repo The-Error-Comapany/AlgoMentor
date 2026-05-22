@@ -42,6 +42,7 @@ export async function GET(req) {
         user,
       });
     } catch (err) {
+      console.error("Token verification or DB user lookup error:", err);
       return NextResponse.json(
         { success: false, message: "Not authorized, token failed" },
         { status: 401 }
@@ -49,6 +50,67 @@ export async function GET(req) {
     }
   } catch (error) {
     console.error("Get user profile error:", error);
+    return NextResponse.json(
+      { success: false, message: error.message || "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(req) {
+  try {
+    await connectDB();
+
+    let token;
+    const authHeader = req.headers.get("authorization");
+
+    if (authHeader && authHeader.startsWith("Bearer")) {
+      token = authHeader.split(" ")[1];
+    }
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: "Not authorized, no token" },
+        { status: 401 }
+      );
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+      const { name, email, lcHandle, cfHandle } = await req.json();
+
+      const updateData = {};
+      if (name !== undefined) updateData.name = name;
+      if (email !== undefined) updateData.email = email;
+      if (lcHandle !== undefined) updateData.lcHandle = lcHandle;
+      if (cfHandle !== undefined) updateData.cfHandle = cfHandle;
+
+      const user = await User.findByIdAndUpdate(
+        decoded.id,
+        { $set: updateData },
+        { new: true }
+      ).select("-password");
+
+      if (!user) {
+        return NextResponse.json(
+          { success: false, message: "User not found" },
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        user,
+      });
+    } catch (err) {
+      console.error("Token verification or DB user update error:", err);
+      return NextResponse.json(
+        { success: false, message: "Not authorized, token failed" },
+        { status: 401 }
+      );
+    }
+  } catch (error) {
+    console.error("Update profile error:", error);
     return NextResponse.json(
       { success: false, message: error.message || "Internal Server Error" },
       { status: 500 }

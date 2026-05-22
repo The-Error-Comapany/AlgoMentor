@@ -3,61 +3,160 @@
 import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/context/AuthContext";
 import { User, KeyRound, Share2, CheckCircle, RefreshCw, AlertTriangle } from "lucide-react";
 
 function SettingsContent() {
+  const { user, setUser } = useAuth();
+
   const [profile, setProfile] = useState({
-    name: "Aishvary",
-    email: "aishvary.cpp@gmail.com",
-    avatar: "A"
+    name: "",
+    email: "",
+    avatar: ""
   });
 
-  // Load registered name if any from settings/profile
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedName = localStorage.getItem("userName");
-      if (storedName) {
-        setProfile((prev) => ({ ...prev, name: storedName }));
-      }
-    }
-  }, []);
-
-  // Handle synchronization states
   const [handles, setHandles] = useState({
-    leetcode: "aishvary_code",
+    leetcode: "",
     codeforces: ""
   });
 
   const [syncStatus, setSyncStatus] = useState({
-    leetcode: "verified", // verified | unlinked | verifying
+    leetcode: "unlinked", // verified | unlinked | verifying
     codeforces: "unlinked"
   });
 
   const [loadingPlatform, setLoadingPlatform] = useState(null);
 
-  const handleVerifySync = (platform) => {
-    if (!handles[platform].trim()) return;
+  // Load registered name and handles from global AuthContext user object
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user.name || "",
+        email: user.email || "",
+        avatar: (user.name || "A").charAt(0).toUpperCase()
+      });
+      setHandles({
+        leetcode: user.lcHandle || "",
+        codeforces: user.cfHandle || ""
+      });
+      setSyncStatus({
+        leetcode: user.lcHandle ? "verified" : "unlinked",
+        codeforces: user.cfHandle ? "verified" : "unlinked"
+      });
+    }
+  }, [user]);
+
+  const handleVerifySync = async (platform) => {
+    const handle = handles[platform].trim();
+    if (!handle) return;
 
     setLoadingPlatform(platform);
     setSyncStatus(prev => ({ ...prev, [platform]: "verifying" }));
 
-    // Simulate handle linking search on platform APIs
-    setTimeout(() => {
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      // 1. Update handle in database via PUT /api/auth/me
+      const profileRes = await fetch("/api/auth/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          [platform === "leetcode" ? "lcHandle" : "cfHandle"]: handle
+        })
+      });
+      
+      const profileData = await profileRes.json();
+      if (!profileData.success) {
+        throw new Error(profileData.message || "Failed to link handle");
+      }
+
+      // 2. Trigger synchronous backend API synchronization
+      const syncRes = await fetch("/api/sync/user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          userId: user?._id || profileData.user?._id,
+          [platform === "leetcode" ? "lcHandle" : "cfHandle"]: handle
+        })
+      });
+
+      const syncData = await syncRes.json();
+      if (!syncData.success) {
+        throw new Error(syncData.error || `Could not verify handle on ${platform}`);
+      }
+
       setSyncStatus(prev => ({ ...prev, [platform]: "verified" }));
+      alert(`${platform === "leetcode" ? "LeetCode" : "Codeforces"} handle linked and synchronized successfully!`);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || `Failed to verify/sync ${platform}`);
+      setSyncStatus(prev => ({ ...prev, [platform]: "unlinked" }));
+    } finally {
       setLoadingPlatform(null);
-    }, 1500);
+    }
   };
 
-  const handleUnlink = (platform) => {
-    setSyncStatus(prev => ({ ...prev, [platform]: "unlinked" }));
-    setHandles(prev => ({ ...prev, [platform]: "" }));
+  const handleUnlink = async (platform) => {
+    if (!confirm(`Are you sure you want to unlink your ${platform === "leetcode" ? "LeetCode" : "Codeforces"} handle?`)) return;
+
+    try {
+      const token = localStorage.getItem("accessToken");
+      const profileRes = await fetch("/api/auth/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          [platform === "leetcode" ? "lcHandle" : "cfHandle"]: ""
+        })
+      });
+      const profileData = await profileRes.json();
+      if (profileData.success) {
+        setSyncStatus(prev => ({ ...prev, [platform]: "unlinked" }));
+        setHandles(prev => ({ ...prev, [platform]: "" }));
+        alert(`${platform === "leetcode" ? "LeetCode" : "Codeforces"} handle unlinked successfully.`);
+      } else {
+        alert(profileData.message || "Failed to unlink handle");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error unlinking handle");
+    }
   };
 
-  const saveProfileInfo = (e) => {
+  const saveProfileInfo = async (e) => {
     e.preventDefault();
-    if (typeof window !== "undefined") {
-      localStorage.setItem("userName", profile.name);
-      alert("Profile information saved successfully!");
+    try {
+      const token = localStorage.getItem("accessToken");
+      const profileRes = await fetch("/api/auth/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: profile.name,
+          email: profile.email
+        })
+      });
+      const profileData = await profileRes.json();
+      if (profileData.success) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("userName", profile.name);
+        }
+        alert("Profile information saved successfully!");
+      } else {
+        alert(profileData.message || "Failed to save profile");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving profile");
     }
   };
 

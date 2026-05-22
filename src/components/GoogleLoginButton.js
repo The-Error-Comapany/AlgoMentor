@@ -5,7 +5,7 @@ import { googleLogin } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
-function GoogleLoginButton() {
+function GoogleLoginButton({ width = 376 }) {
   const router = useRouter();
   const { login } = useAuth();
 
@@ -18,8 +18,12 @@ function GoogleLoginButton() {
         callback: async (response) => {
           try {
             const res = await googleLogin(response.credential);
-            login(res.accessToken);
-            router.push("/home");
+            if (res.success && res.accessToken) {
+              login(res.accessToken);
+              router.push("/dashboard");
+            } else {
+              alert(res.message || "Google login failed. Try another method.");
+            }
           } catch (err) {
             alert(
               err.response?.data?.message ||
@@ -34,17 +38,28 @@ function GoogleLoginButton() {
         {
           theme: "outline",
           size: "large",
-          width: 260,
+          width: width,
         }
       );
     };
 
-    // small delay ensures DOM ready
-    setTimeout(initGoogle, 100);
+    // Poll for window.google availability to prevent script loading race conditions
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (window.google) {
+        clearInterval(interval);
+        initGoogle();
+      } else if (attempts >= 50) { // 5s max wait time
+        clearInterval(interval);
+        console.error("Google platform script load timeout.");
+      }
+    }, 100);
 
-  }, [login, router]);
+    return () => clearInterval(interval);
+  }, [login, router, width]);
 
-  return <div id="google-btn"></div>;
+  return <div id="google-btn" style={{ minHeight: "44px", width: "100%", display: "flex", justifyContent: "center" }}></div>;
 }
 
 export default GoogleLoginButton;

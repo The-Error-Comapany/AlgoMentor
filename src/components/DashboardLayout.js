@@ -26,7 +26,7 @@ import {
 import "./DashboardLayout.css";
 
 function DashboardLayout({ children }) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -153,10 +153,12 @@ function DashboardLayout({ children }) {
 
         <div className="db-sidebar-footer">
           <div className="db-user-info" onClick={() => handleNavClick("/profile")} style={{ cursor: "pointer" }}>
-            <div className="db-user-avatar">A</div>
+            <div className="db-user-avatar">{user?.name ? user.name[0].toUpperCase() : "U"}</div>
             <div className="db-user-details">
-              <span className="db-user-name">Aishvary</span>
-              <span className="db-user-handle">@aishvary_code</span>
+              <span className="db-user-name">{user?.name || "User"}</span>
+              <span className="db-user-handle">
+                {user?.lcHandle ? `@${user.lcHandle}` : user?.cfHandle ? `@${user.cfHandle}` : "@algo_mentor"}
+              </span>
             </div>
           </div>
           <button className="db-logout-btn" onClick={handleLogout} title="Log Out">
