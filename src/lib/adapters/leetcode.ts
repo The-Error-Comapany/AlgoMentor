@@ -95,12 +95,12 @@ export async function fetchLCPOTD() {
 
 export async function fetchLCUpcomingContests() {
   const query = `
-    query upcomingContests {
-      upcomingContests {
+    query topTwoContests {
+      topTwoContests {
         title titleSlug startTime duration
       }
     }
   `;
   const data = await queryLeetCode(query);
-  return data?.upcomingContests || [];
+  return data?.topTwoContests || [];
 }

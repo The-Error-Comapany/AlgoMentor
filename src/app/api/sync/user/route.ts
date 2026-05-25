@@ -151,6 +151,8 @@ export async function POST(request: NextRequest) {
           date: new Date(h.ratingUpdateTimeSeconds * 1000),
         }));
 
+        const solved = Object.values(topicStats || {}).reduce((sum: number, count: any) => sum + (count || 0), 0);
+
         await UserStats.findOneAndUpdate(
           { userId, platform: "codeforces" },
           {
@@ -159,6 +161,7 @@ export async function POST(request: NextRequest) {
             rating: user.rating,
             maxRating: user.maxRating,
             rank: user.rank,
+            solved,
             ratingHistory: formattedHistory,
             lastSynced: new Date(),
           },

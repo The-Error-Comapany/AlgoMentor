@@ -148,7 +148,8 @@ function DashboardContent() {
   const lcStats = stats.find((s) => s.platform === "leetcode");
   const cfStats = stats.find((s) => s.platform === "codeforces");
 
-  const totalSolved = (lcStats?.solved || 0) + (cfStats?.solved || 0);
+  const cfSolved = cfStats?.solved || topics.filter(t => t.platform === "codeforces").reduce((sum, t) => sum + t.count, 0) || 0;
+  const totalSolved = (lcStats?.solved || 0) + cfSolved;
   const lcRating = lcStats?.rating || null;
   const cfRating = cfStats?.rating || null;
   const cfRank = cfStats?.rank || "N/A";
@@ -274,14 +275,23 @@ function DashboardContent() {
       <div className="grid-4">
         
         <div className="glass-card" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "var(--text-success)", width: "42px", height: "42px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "var(--text-success)", width: "42px", height: "42px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <CheckCircle2 size={20} />
           </div>
           <div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Total Solved</span>
-            <h3 style={{ fontSize: "1.4rem", margin: "0" }}>
+            <h3 style={{ fontSize: "1.4rem", margin: "0", fontWeight: "700" }}>
               {totalSolved}
             </h3>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "4px", fontSize: "0.68rem" }}>
+              <span style={{ color: "#ffa116" }}>
+                LC: <strong style={{ color: "white" }}>{lcStats?.solved || 0}</strong>
+              </span>
+              <span style={{ color: "var(--text-muted)" }}>|</span>
+              <span style={{ color: "#318dec" }}>
+                CF: <strong style={{ color: "white" }}>{cfSolved}</strong>
+              </span>
+            </div>
           </div>
         </div>
 
