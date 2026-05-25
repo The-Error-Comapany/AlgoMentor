@@ -5,6 +5,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/context/AuthContext";
 import { Search, ExternalLink, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { allProblems } from "@/lib/problemsData";
 
 // Deterministic parsed problems from actual synced submissions
 const getDeterministicProblemInfo = (title, platform, titleSlug) => {
@@ -41,46 +42,9 @@ function ProblemsContent() {
   const itemsPerPage = 8;
 
   useEffect(() => {
-    if (!user?._id) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchProblems = async () => {
-      try {
-        const res = await fetch(`/api/user/submissions?userId=${user._id}&limit=100`);
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const seen = new Set();
-          const uniqueProbs = [];
-
-          data.forEach((sub, idx) => {
-            if (!sub.title || seen.has(sub.title.toLowerCase())) return;
-            seen.add(sub.title.toLowerCase());
-
-            const platformName = sub.platform === "leetcode" ? "LeetCode" : "Codeforces";
-            const { difficulty, tags, url } = getDeterministicProblemInfo(sub.title, sub.platform, sub.titleSlug);
-
-            uniqueProbs.push({
-              id: sub._id || idx,
-              title: sub.title,
-              platform: platformName,
-              difficulty,
-              tags,
-              url
-            });
-          });
-          setProblems(uniqueProbs);
-        }
-      } catch (err) {
-        console.error("Error fetching solved problems:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProblems();
-  }, [user]);
+    setProblems(allProblems);
+    setLoading(false);
+  }, []);
 
   // Load tag filter from query param on mount if clicked from dashboard/elsewhere
   useEffect(() => {
@@ -119,7 +83,7 @@ function ProblemsContent() {
 
       return matchesSearch && matchesPlatform && matchesDifficulty && matchesTags;
     });
-  }, [search, selectedPlatform, selectedDifficulty, selectedTag]);
+  }, [problems, search, selectedPlatform, selectedDifficulty, selectedTag]);
 
   // Paginated slice
   const paginatedProblems = useMemo(() => {
@@ -195,8 +159,17 @@ function ProblemsContent() {
               <option value="Easy" style={{ background: "#0a0d14", color: "white" }}>Easy</option>
               <option value="Medium" style={{ background: "#0a0d14", color: "white" }}>Medium</option>
               <option value="Hard" style={{ background: "#0a0d14", color: "white" }}>Hard</option>
-              <option value="Div1" style={{ background: "#0a0d14", color: "white" }}>Div1 (CF)</option>
-              <option value="Div2" style={{ background: "#0a0d14", color: "white" }}>Div2 (CF)</option>
+              <option value="800" style={{ background: "#0a0d14", color: "white" }}>800 (CF)</option>
+              <option value="900" style={{ background: "#0a0d14", color: "white" }}>900 (CF)</option>
+              <option value="1000" style={{ background: "#0a0d14", color: "white" }}>1000 (CF)</option>
+              <option value="1100" style={{ background: "#0a0d14", color: "white" }}>1100 (CF)</option>
+              <option value="1200" style={{ background: "#0a0d14", color: "white" }}>1200 (CF)</option>
+              <option value="1300" style={{ background: "#0a0d14", color: "white" }}>1300 (CF)</option>
+              <option value="1400" style={{ background: "#0a0d14", color: "white" }}>1400 (CF)</option>
+              <option value="1500" style={{ background: "#0a0d14", color: "white" }}>1500 (CF)</option>
+              <option value="1600" style={{ background: "#0a0d14", color: "white" }}>1600 (CF)</option>
+              <option value="1700" style={{ background: "#0a0d14", color: "white" }}>1700 (CF)</option>
+              <option value="1800" style={{ background: "#0a0d14", color: "white" }}>1800 (CF)</option>
             </select>
           </div>
 
@@ -282,7 +255,13 @@ function ProblemsContent() {
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${prob.difficulty === "Easy" ? "badge-easy" : prob.difficulty === "Hard" || prob.difficulty === "Div1" ? "badge-hard" : "badge-medium"}`}>
+                        <span className={`badge ${
+                          prob.difficulty === "Easy" || (prob.platform === "Codeforces" && parseInt(prob.difficulty) <= 1000)
+                            ? "badge-easy" 
+                            : prob.difficulty === "Hard" || (prob.platform === "Codeforces" && parseInt(prob.difficulty) >= 1500) 
+                              ? "badge-hard" 
+                              : "badge-medium"
+                        }`}>
                           {prob.difficulty}
                         </span>
                       </td>
