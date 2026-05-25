@@ -72,6 +72,7 @@ function SettingsContent() {
       if (!profileData.success) {
         throw new Error(profileData.message || "Failed to link handle");
       }
+      setUser(profileData.user);
 
       // 2. Trigger synchronous backend API synchronization
       const syncRes = await fetch("/api/sync/user", {
@@ -118,6 +119,7 @@ function SettingsContent() {
       });
       const profileData = await profileRes.json();
       if (profileData.success) {
+        setUser(profileData.user);
         setSyncStatus(prev => ({ ...prev, [platform]: "unlinked" }));
         setHandles(prev => ({ ...prev, [platform]: "" }));
         alert(`${platform === "leetcode" ? "LeetCode" : "Codeforces"} handle unlinked successfully.`);

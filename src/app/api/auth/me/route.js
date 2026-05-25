@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import connectDB from "@/utils/db";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
+import UserStats from "@/lib/models/UserStats";
+import Submission from "@/lib/models/Submission";
+import TopicStat from "@/lib/models/TopicStat";
 
 export async function GET(req) {
   try {
@@ -84,6 +87,19 @@ export async function PUT(req) {
       if (email !== undefined) updateData.email = email;
       if (lcHandle !== undefined) updateData.lcHandle = lcHandle;
       if (cfHandle !== undefined) updateData.cfHandle = cfHandle;
+
+      if (lcHandle === "") {
+        console.log(`Clearing LeetCode stats for unlinked user ${decoded.id}`);
+        await UserStats.deleteMany({ userId: decoded.id, platform: "leetcode" });
+        await Submission.deleteMany({ userId: decoded.id, platform: "leetcode" });
+        await TopicStat.deleteMany({ userId: decoded.id, platform: "leetcode" });
+      }
+      if (cfHandle === "") {
+        console.log(`Clearing Codeforces stats for unlinked user ${decoded.id}`);
+        await UserStats.deleteMany({ userId: decoded.id, platform: "codeforces" });
+        await Submission.deleteMany({ userId: decoded.id, platform: "codeforces" });
+        await TopicStat.deleteMany({ userId: decoded.id, platform: "codeforces" });
+      }
 
       const user = await User.findByIdAndUpdate(
         decoded.id,

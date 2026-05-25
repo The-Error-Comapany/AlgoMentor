@@ -144,18 +144,37 @@ function DashboardContent() {
     setReminders((prev) => ({ ...prev, [platform]: !prev[platform] }));
   };
 
-  // Aggregated Stats Calculations
-  const lcStats = stats.find((s) => s.platform === "leetcode");
-  const cfStats = stats.find((s) => s.platform === "codeforces");
+  // Filter data based on whether handles are currently connected/linked
+  const activeStats = stats.filter(s => {
+    if (s.platform === "leetcode" && !user?.lcHandle) return false;
+    if (s.platform === "codeforces" && !user?.cfHandle) return false;
+    return true;
+  });
 
-  const cfSolved = cfStats?.solved || topics.filter(t => t.platform === "codeforces").reduce((sum, t) => sum + t.count, 0) || 0;
+  const activeSubmissions = submissions.filter(s => {
+    if (s.platform === "leetcode" && !user?.lcHandle) return false;
+    if (s.platform === "codeforces" && !user?.cfHandle) return false;
+    return true;
+  });
+
+  const activeTopics = topics.filter(t => {
+    if (t.platform === "leetcode" && !user?.lcHandle) return false;
+    if (t.platform === "codeforces" && !user?.cfHandle) return false;
+    return true;
+  });
+
+  // Aggregated Stats Calculations
+  const lcStats = user?.lcHandle ? activeStats.find((s) => s.platform === "leetcode") : null;
+  const cfStats = user?.cfHandle ? activeStats.find((s) => s.platform === "codeforces") : null;
+
+  const cfSolved = cfStats?.solved || (user?.cfHandle ? activeTopics.filter(t => t.platform === "codeforces").reduce((sum, t) => sum + t.count, 0) : 0);
   const totalSolved = (lcStats?.solved || 0) + cfSolved;
   const lcRating = lcStats?.rating || null;
   const cfRating = cfStats?.rating || null;
   const cfRank = cfStats?.rank || "N/A";
 
   // Calculate weekly goal progress (accepted submissions in the last 7 days vs target of 10)
-  const last7DaysAccepted = submissions.filter((s) => {
+  const last7DaysAccepted = activeSubmissions.filter((s) => {
     if (s.verdict.toLowerCase() !== "accepted" && s.verdict.toLowerCase() !== "ok") return false;
     const subDate = new Date(s.timestamp);
     const oneWeekAgo = new Date();
@@ -204,7 +223,7 @@ function DashboardContent() {
     return streak;
   };
 
-  const currentStreak = calculateStreak(submissions);
+  const currentStreak = calculateStreak(activeSubmissions);
 
   // Find next upcoming contests
   const upcomingLC = contests
@@ -219,12 +238,20 @@ function DashboardContent() {
   const [recommendation, setRecommendation] = useState("Link your competitive coding handles in Settings to analyze your performance and receive personalized AI recommendations.");
   
   useEffect(() => {
-    if (topics.length > 0) {
-      const sortedTopics = [...topics].sort((a, b) => a.count - b.count);
+    const activeTopics = topics.filter(t => {
+      if (t.platform === "leetcode" && !user?.lcHandle) return false;
+      if (t.platform === "codeforces" && !user?.cfHandle) return false;
+      return true;
+    });
+
+    if (activeTopics.length > 0) {
+      const sortedTopics = [...activeTopics].sort((a, b) => a.count - b.count);
       const weakTopic = sortedTopics[0]?.topic || "Algorithms";
       setRecommendation(`Based on your synced solve history, we recommend focusing on ${weakTopic} problems. Improving your mastery in this category will help boost your performance.`);
     } else if (user?.lcHandle || user?.cfHandle) {
       setRecommendation("Generating diagnostic recommendations... Run sync in Settings to fetch your topic distributions.");
+    } else {
+      setRecommendation("Link your competitive coding handles in Settings to analyze your performance and receive personalized AI recommendations.");
     }
   }, [topics, user]);
 
@@ -393,7 +420,7 @@ function DashboardContent() {
             </div>
 
             <div className="table-container" style={{ border: "none", background: "none" }}>
-              {submissions.length > 0 ? (
+              {activeSubmissions.length > 0 ? (
                 <table>
                   <thead>
                     <tr>
@@ -405,7 +432,7 @@ function DashboardContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {submissions.slice(0, 5).map((sub, i) => (
+                    {activeSubmissions.slice(0, 5).map((sub, i) => (
                       <tr key={i}>
                         <td>
                           <a 

@@ -75,9 +75,28 @@ function ProfileContent() {
       : `https://codeforces.com/problemset/problem/${titleSlug || "1800/A"}`;
   };
 
+  // Filter data based on active handles
+  const activeStats = stats.filter(s => {
+    if (s.platform === "leetcode" && !user?.lcHandle) return false;
+    if (s.platform === "codeforces" && !user?.cfHandle) return false;
+    return true;
+  });
+
+  const activeSubmissions = submissions.filter(s => {
+    if (s.platform === "leetcode" && !user?.lcHandle) return false;
+    if (s.platform === "codeforces" && !user?.cfHandle) return false;
+    return true;
+  });
+
+  const activeTopics = topics.filter(t => {
+    if (t.platform === "leetcode" && !user?.lcHandle) return false;
+    if (t.platform === "codeforces" && !user?.cfHandle) return false;
+    return true;
+  });
+
   // Find individual platforms stats
-  const lcStats = stats.find((s) => s.platform === "leetcode");
-  const cfStats = stats.find((s) => s.platform === "codeforces");
+  const lcStats = user?.lcHandle ? activeStats.find((s) => s.platform === "leetcode") : null;
+  const cfStats = user?.cfHandle ? activeStats.find((s) => s.platform === "codeforces") : null;
 
   const lcSolved = lcStats?.solved || 0;
   const lcEasy = lcStats?.easySolved || 0;
@@ -85,8 +104,8 @@ function ProfileContent() {
   const lcHard = lcStats?.hardSolved || 0;
 
   // Codeforces solved can be calculated from topics or default to submissions count
-  const cfSolved = topics.filter(t => t.platform === "codeforces").reduce((sum, t) => sum + t.count, 0) || 
-                   submissions.filter(s => s.platform === "codeforces" && (s.verdict === "Accepted" || s.verdict === "OK")).length;
+  const cfSolved = user?.cfHandle ? (activeTopics.filter(t => t.platform === "codeforces").reduce((sum, t) => sum + t.count, 0) || 
+                   activeSubmissions.filter(s => s.platform === "codeforces" && (s.verdict === "Accepted" || s.verdict === "OK")).length) : 0;
 
   const easySolved = lcEasy;
   const mediumSolved = lcMedium;
@@ -100,7 +119,7 @@ function ProfileContent() {
   };
 
   // Group topics for progress bar display
-  const topicDistribution = [...topics]
+  const topicDistribution = [...activeTopics]
     .sort((a, b) => b.count - a.count)
     .slice(0, 5)
     .map(t => {
@@ -116,7 +135,7 @@ function ProfileContent() {
     });
 
   // Strengths & Weaknesses tags
-  const sortedTopics = [...topics].sort((a, b) => b.count - a.count);
+  const sortedTopics = [...activeTopics].sort((a, b) => b.count - a.count);
   const strengthTags = sortedTopics.slice(0, 3).map(t => t.topic);
   const weaknessTags = sortedTopics.slice(-3).reverse().map(t => t.topic);
 
@@ -508,7 +527,7 @@ function ProfileContent() {
         </div>
 
         <div className="table-container">
-          {submissions.length > 0 ? (
+          {activeSubmissions.length > 0 ? (
             <table>
               <thead>
                 <tr>
@@ -520,7 +539,7 @@ function ProfileContent() {
                 </tr>
               </thead>
               <tbody>
-                {submissions.map((sub, idx) => (
+                {activeSubmissions.map((sub, idx) => (
                   <tr key={idx}>
                     <td>
                       <a 
