@@ -80,13 +80,14 @@ export async function PUT(req) {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-      const { name, email, lcHandle, cfHandle } = await req.json();
+      const { name, email, lcHandle, cfHandle, weeklyGoalTarget } = await req.json();
 
       const updateData = {};
       if (name !== undefined) updateData.name = name;
       if (email !== undefined) updateData.email = email;
       if (lcHandle !== undefined) updateData.lcHandle = lcHandle;
       if (cfHandle !== undefined) updateData.cfHandle = cfHandle;
+      if (weeklyGoalTarget !== undefined) updateData.weeklyGoalTarget = weeklyGoalTarget;
 
       if (lcHandle === "") {
         console.log(`Clearing LeetCode stats for unlinked user ${decoded.id}`);

@@ -12,7 +12,8 @@ function SettingsContent() {
   const [profile, setProfile] = useState({
     name: "",
     email: "",
-    avatar: ""
+    avatar: "",
+    weeklyGoalTarget: 10
   });
 
   const [handles, setHandles] = useState({
@@ -33,7 +34,8 @@ function SettingsContent() {
       setProfile({
         name: user.name || "",
         email: user.email || "",
-        avatar: (user.name || "A").charAt(0).toUpperCase()
+        avatar: (user.name || "A").charAt(0).toUpperCase(),
+        weeklyGoalTarget: user.weeklyGoalTarget || 10
       });
       setHandles({
         leetcode: user.lcHandle || "",
@@ -144,7 +146,8 @@ function SettingsContent() {
         },
         body: JSON.stringify({
           name: profile.name,
-          email: profile.email
+          email: profile.email,
+          weeklyGoalTarget: profile.weeklyGoalTarget
         })
       });
       const profileData = await profileRes.json();
@@ -224,6 +227,17 @@ function SettingsContent() {
                   required
                   value={profile.email}
                   onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", display: "block", marginBottom: "6px" }}>Weekly Goal Target</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  max="100"
+                  value={profile.weeklyGoalTarget}
+                  onChange={(e) => setProfile({ ...profile, weeklyGoalTarget: parseInt(e.target.value) || 1 })}
                 />
               </div>
               <button type="submit" className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start", marginTop: "0.25rem", padding: "0.5rem 1.25rem" }}>

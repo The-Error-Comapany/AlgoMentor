@@ -57,7 +57,26 @@ export const neetcode150 = [
   { title: "Kth Smallest Element in a BST", platform: "LeetCode", difficulty: "Medium", tags: ["trees"], url: "https://leetcode.com/problems/kth-smallest-element-in-a-bst/" },
   { title: "Construct Binary Tree from Preorder and Inorder Traversal", platform: "LeetCode", difficulty: "Medium", tags: ["trees", "arrays"], url: "https://leetcode.com/problems/construct-binary-tree-from-preorder-and-inorder-traversal/" },
   { title: "Binary Tree Maximum Path Sum", platform: "LeetCode", difficulty: "Hard", tags: ["trees"], url: "https://leetcode.com/problems/binary-tree-maximum-path-sum/" },
-  { title: "Serialize and Deserialize Binary Tree", platform: "LeetCode", difficulty: "Hard", tags: ["trees", "strings"], url: "https://leetcode.com/problems/serialize-and-deserialize-binary-tree/" }
+  { title: "Serialize and Deserialize Binary Tree", platform: "LeetCode", difficulty: "Hard", tags: ["trees", "strings"], url: "https://leetcode.com/problems/serialize-and-deserialize-binary-tree/" },
+  { title: "Implement Trie (Prefix Tree)", platform: "LeetCode", difficulty: "Medium", tags: ["tries", "design"], url: "https://leetcode.com/problems/implement-trie-prefix-tree/" },
+  { title: "Design Add and Search Words Data Structure", platform: "LeetCode", difficulty: "Medium", tags: ["tries", "design"], url: "https://leetcode.com/problems/design-add-and-search-words-data-structure/" },
+  { title: "Word Search II", platform: "LeetCode", difficulty: "Hard", tags: ["tries", "backtracking"], url: "https://leetcode.com/problems/word-search-ii/" },
+  { title: "Kth Largest Element in a Stream", platform: "LeetCode", difficulty: "Easy", tags: ["heap", "design"], url: "https://leetcode.com/problems/kth-largest-element-in-a-stream/" },
+  { title: "Last Stone Weight", platform: "LeetCode", difficulty: "Easy", tags: ["heap", "arrays"], url: "https://leetcode.com/problems/last-stone-weight/" },
+  { title: "K Closest Points to Origin", platform: "LeetCode", difficulty: "Medium", tags: ["heap", "geometry"], url: "https://leetcode.com/problems/k-closest-points-to-origin/" },
+  { title: "Kth Largest Element in an Array", platform: "LeetCode", difficulty: "Medium", tags: ["heap", "arrays", "sorting"], url: "https://leetcode.com/problems/kth-largest-element-in-an-array/" },
+  { title: "Task Scheduler", platform: "LeetCode", difficulty: "Medium", tags: ["heap", "arrays", "greedy"], url: "https://leetcode.com/problems/task-scheduler/" },
+  { title: "Design Twitter", platform: "LeetCode", difficulty: "Medium", tags: ["heap", "design"], url: "https://leetcode.com/problems/design-twitter/" },
+  { title: "Find Median from Data Stream", platform: "LeetCode", difficulty: "Hard", tags: ["heap", "design"], url: "https://leetcode.com/problems/find-median-from-data-stream/" },
+  { title: "Subsets", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "arrays"], url: "https://leetcode.com/problems/subsets/" },
+  { title: "Combination Sum", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "arrays"], url: "https://leetcode.com/problems/combination-sum/" },
+  { title: "Permutations", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "arrays"], url: "https://leetcode.com/problems/permutations/" },
+  { title: "Subsets II", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "arrays"], url: "https://leetcode.com/problems/subsets-ii/" },
+  { title: "Combination Sum II", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "arrays"], url: "https://leetcode.com/problems/combination-sum-ii/" },
+  { title: "Word Search", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "arrays"], url: "https://leetcode.com/problems/word-search/" },
+  { title: "Palindrome Partitioning", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "strings"], url: "https://leetcode.com/problems/palindrome-partitioning/" },
+  { title: "Letter Combinations of a Phone Number", platform: "LeetCode", difficulty: "Medium", tags: ["backtracking", "strings", "hashing"], url: "https://leetcode.com/problems/letter-combinations-of-a-phone-number/" },
+  { title: "N-Queens", platform: "LeetCode", difficulty: "Hard", tags: ["backtracking", "arrays"], url: "https://leetcode.com/problems/n-queens/" }
 ].map((p, idx) => ({ ...p, id: `nc150_${idx}` }));
 
 export const cp31 = [

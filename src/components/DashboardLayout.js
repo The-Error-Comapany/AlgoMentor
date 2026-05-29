@@ -32,33 +32,69 @@ function DashboardLayout({ children }) {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [extConnected, setExtConnected] = useState(true);
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Contest in 2 Hours",
-      desc: "Codeforces Round 998 starts at 13:30. Ready to compete?",
-      time: "2 hours ago",
-      unread: true,
-      icon: <Calendar size={16} />
-    },
-    {
-      id: 2,
-      title: "New AI Recommendation",
-      desc: "Based on DP rating progress, Sliding Window study path is updated.",
-      time: "4 hours ago",
-      unread: true,
-      icon: <Brain size={16} />
-    },
-    {
-      id: 3,
-      title: "Extension Synced Successfully",
-      desc: "Complexity Analysis for 'Sliding Window Maximum' is saved to your account.",
-      time: "Yesterday",
-      unread: false,
-      icon: <CheckCircle size={16} />
+
+  // Fetch notifications dynamically
+  useEffect(() => {
+    async function fetchNotificationsData() {
+      if (!user?._id) return;
+      
+      try {
+        const notifs = [];
+        let idCounter = 1;
+        
+        // Fetch upcoming contests
+        const contestsRes = await fetch("/api/contests");
+        const contestsData = await contestsRes.json();
+        
+        if (Array.isArray(contestsData)) {
+          const now = new Date();
+          const upcoming = contestsData.filter(c => new Date(c.startTime) > now).slice(0, 3);
+          
+          upcoming.forEach(c => {
+            notifs.push({
+              id: idCounter++,
+              title: "Upcoming Contest",
+              desc: `${c.name} on ${c.platform.charAt(0).toUpperCase() + c.platform.slice(1)}.`,
+              time: new Date(c.startTime).toLocaleString(),
+              unread: true,
+              icon: <Calendar size={16} />
+            });
+          });
+        }
+        
+        // Fetch user stats for achievements
+        const statsRes = await fetch(`/api/user/stats?userId=${user._id}`);
+        const statsData = await statsRes.json();
+        
+        if (Array.isArray(statsData)) {
+          let totalSolved = 0;
+          statsData.forEach(s => {
+            totalSolved += (s.solved || 0);
+          });
+          
+          if (totalSolved >= 100) {
+            const milestone = Math.floor(totalSolved / 100) * 100;
+            notifs.push({
+              id: idCounter++,
+              title: "Achievement Unlocked! 🏆",
+              desc: `You crossed ${milestone} problems solved! Keep it up!`,
+              time: "Just now",
+              unread: true,
+              icon: <Brain size={16} />
+            });
+          }
+        }
+        
+        setNotifications(notifs);
+      } catch (err) {
+        console.error("Failed to fetch notification data:", err);
+      }
     }
-  ]);
+    
+    fetchNotificationsData();
+  }, [user]);
 
   const notifRef = useRef(null);
 
@@ -113,7 +149,7 @@ function DashboardLayout({ children }) {
   };
 
   const markAllRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+    setNotifications([]);
   };
 
   const unreadCount = notifications.filter(n => n.unread).length;
@@ -192,15 +228,6 @@ function DashboardLayout({ children }) {
               <span className="db-search-shortcut">Ctrl K</span>
             </div>
 
-            {/* Chrome Extension connected pill */}
-            <div
-              className={`db-ext-pill ${extConnected ? "db-ext-connected" : "db-ext-disconnected"}`}
-              onClick={() => setExtConnected(!extConnected)}
-              title="Click to toggle simulated Chrome Extension connection!"
-            >
-              <div className={`db-ext-dot ${extConnected ? "db-ext-dot-active pulse-green" : "db-ext-dot-inactive pulse-yellow"}`} />
-              <span>Ext: {extConnected ? "Connected" : "Inactive"}</span>
-            </div>
 
             {/* Notifications panel */}
             <div className="db-notification-container" ref={notifRef}>

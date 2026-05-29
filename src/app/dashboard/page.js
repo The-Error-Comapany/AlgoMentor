@@ -173,15 +173,21 @@ function DashboardContent() {
   const cfRating = cfStats?.rating || null;
   const cfRank = cfStats?.rank || "N/A";
 
-  // Calculate weekly goal progress (accepted submissions in the last 7 days vs target of 10)
-  const last7DaysAccepted = activeSubmissions.filter((s) => {
-    if (s.verdict.toLowerCase() !== "accepted" && s.verdict.toLowerCase() !== "ok") return false;
-    const subDate = new Date(s.timestamp);
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    return subDate >= oneWeekAgo;
+  const today = new Date();
+  const solvedDates = new Set(
+    activeSubmissions
+      .filter(s => s.verdict.toLowerCase() === "accepted" || s.verdict.toLowerCase() === "ok")
+      .map(s => new Date(s.timestamp).toDateString())
+  );
+
+  // Calculate weekly goal progress (accepted submissions in the last 7 days vs user target)
+  const last7DaysAccepted = [...solvedDates].filter(d => {
+    const date = new Date(d);
+    const diff = (today - date) / (1000 * 60 * 60 * 24);
+    return diff <= 7;
   }).length;
-  const weeklyGoalTarget = 10;
+
+  const weeklyGoalTarget = user?.weeklyGoalTarget || 10;
   const weeklyGoalPercent = Math.min(100, Math.round((last7DaysAccepted / weeklyGoalTarget) * 100));
 
   // Calculate streak from submissions
