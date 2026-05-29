@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
                       startTime: new Date(c.startTime * 1000),
                       duration: c.duration,
                       url,
+                      endTime: new Date((c.startTime + c.duration) * 1000),
                     },
                     { upsert: true }
                   );
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
                       startTime: new Date(c.startTimeSeconds * 1000),
                       duration: c.durationSeconds,
                       url,
+                      endTime: new Date((c.startTimeSeconds + c.durationSeconds) * 1000),
                     },
                     { upsert: true }
                   );

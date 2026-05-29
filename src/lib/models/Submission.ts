@@ -17,7 +17,11 @@ const SubmissionSchema = new Schema<ISubmission>({
   titleSlug: { type: String, required: true },
   verdict: { type: String, required: true },
   language: { type: String, required: true },
-  timestamp: { type: Date, required: true },
+  timestamp: { 
+    type: Date, 
+    required: true,
+    expires: 30 * 24 * 60 * 60 // 30 days in seconds
+  },
 });
 
 // Compound index for fast upserts and querying

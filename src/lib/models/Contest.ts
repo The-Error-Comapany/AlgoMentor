@@ -7,6 +7,7 @@ export interface IContest extends Document {
   startTime: Date;
   duration: number; // in seconds
   url: string;
+  endTime: Date;
 }
 
 const ContestSchema = new Schema<IContest>({
@@ -16,6 +17,11 @@ const ContestSchema = new Schema<IContest>({
   startTime: { type: Date, required: true },
   duration: { type: Number, required: true },
   url: { type: String, required: true },
+  endTime: { 
+    type: Date, 
+    required: true,
+    expires: 24 * 60 * 60 // 24 hours in seconds
+  },
 });
 
 // Platform + Slug unique index

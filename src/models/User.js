@@ -78,7 +78,15 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 // ---------------- MODEL ----------------
 // Prevent compilation errors on hot reload in Next.js
-delete mongoose.models.User;
-const User = mongoose.model("User", userSchema);
+// Add partial TTL index for unverified users
+userSchema.index(
+  { createdAt: 1 }, 
+  { 
+    expireAfterSeconds: 24 * 60 * 60, // 24 hours in seconds
+    partialFilterExpression: { isEmailVerified: false }
+  }
+);
+
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default User;
