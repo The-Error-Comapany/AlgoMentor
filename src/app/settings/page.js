@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/context/AuthContext";
 import { User, KeyRound, Share2, CheckCircle, RefreshCw, AlertTriangle } from "lucide-react";
 
 function SettingsContent() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, logout } = useAuth();
+  const router = useRouter();
+
+  const [passwords, setPasswords] = useState({ current: "", new: "" });
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const [profile, setProfile] = useState({
     name: "",
@@ -162,6 +167,69 @@ function SettingsContent() {
     } catch (err) {
       console.error(err);
       alert("Error saving profile");
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    setPasswordLoading(true);
+    
+    if (user?.googleId) {
+      alert("Google accounts do not have passwords. Please use Google Sign-In.");
+      setPasswordLoading(false);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch("/api/auth/password", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.new
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Password updated successfully!");
+        setPasswords({ current: "", new: "" });
+      } else {
+        alert(data.message || "Failed to update password");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating password");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!confirm("WARNING: Deleting your account will purge all synchronization handles, solved diagnostics history, and browser cache. This action is irreversible. Are you absolutely sure?")) return;
+    
+    try {
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch("/api/auth/me", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Your account has been deleted.");
+        logout();
+        router.push("/");
+      } else {
+        alert(data.message || "Failed to delete account");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting account");
     }
   };
 
@@ -376,13 +444,34 @@ function SettingsContent() {
             {/* Change Password Block */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <h4 style={{ fontSize: "0.85rem", color: "white", margin: "0", fontWeight: "600" }}>Change Account Password</h4>
-              <form style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }} onSubmit={(e) => { e.preventDefault(); alert("Password updated successfully!"); }}>
-                <input type="password" placeholder="Current password" required style={{ height: "38px", fontSize: "0.85rem" }} />
-                <input type="password" placeholder="New password (min 6 characters)" required style={{ height: "38px", fontSize: "0.85rem" }} />
-                <button type="submit" className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start", padding: "0.5rem 1rem", fontSize: "0.75rem" }}>
-                  Update Password
-                </button>
-              </form>
+              {user?.googleId ? (
+                <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: "0" }}>
+                  You signed in with Google. Password updates are managed through your Google account.
+                </p>
+              ) : (
+                <form style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }} onSubmit={handleUpdatePassword}>
+                  <input 
+                    type="password" 
+                    placeholder="Current password" 
+                    required 
+                    value={passwords.current}
+                    onChange={(e) => setPasswords({...passwords, current: e.target.value})}
+                    style={{ height: "38px", fontSize: "0.85rem" }} 
+                  />
+                  <input 
+                    type="password" 
+                    placeholder="New password (min 6 characters)" 
+                    required 
+                    minLength={6}
+                    value={passwords.new}
+                    onChange={(e) => setPasswords({...passwords, new: e.target.value})}
+                    style={{ height: "38px", fontSize: "0.85rem" }} 
+                  />
+                  <button type="submit" disabled={passwordLoading} className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start", padding: "0.5rem 1rem", fontSize: "0.75rem" }}>
+                    {passwordLoading ? "Updating..." : "Update Password"}
+                  </button>
+                </form>
+              )}
             </div>
 
             <hr style={{ border: "none", borderTop: "1px solid var(--border-ice)" }} />
@@ -400,7 +489,7 @@ function SettingsContent() {
               <button 
                 className="btn btn-danger btn-sm" 
                 style={{ alignSelf: "flex-start", padding: "0.5rem 1rem", fontSize: "0.75rem" }} 
-                onClick={() => confirm("Are you sure you want to delete your Algo Mentor account?") && alert("Account simulation terminated.")}
+                onClick={handleDeleteAccount}
               >
                 Delete Account
               </button>

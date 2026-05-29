@@ -139,7 +139,7 @@ export default function Register() {
               </div>
             )}
 
-            <form onSubmit={handleSignupSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <form onSubmit={handleSignupSubmit} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               <div style={{ position: "relative" }}>
                 <User size={16} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
                 <input
@@ -149,6 +149,7 @@ export default function Register() {
                   value={form.name}
                   onChange={handleChange}
                   style={{ paddingLeft: "2.75rem" }}
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -162,6 +163,7 @@ export default function Register() {
                   value={form.email}
                   onChange={handleChange}
                   style={{ paddingLeft: "2.75rem" }}
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -175,6 +177,7 @@ export default function Register() {
                   value={form.password}
                   onChange={handleChange}
                   style={{ paddingLeft: "2.75rem" }}
+                  autoComplete="new-password"
                   required
                 />
               </div>

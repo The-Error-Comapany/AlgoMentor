@@ -136,3 +136,60 @@ export async function PUT(req) {
     );
   }
 }
+
+export async function DELETE(req) {
+  try {
+    await connectDB();
+
+    let token;
+    const authHeader = req.headers.get("authorization");
+
+    if (authHeader && authHeader.startsWith("Bearer")) {
+      token = authHeader.split(" ")[1];
+    }
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: "Not authorized, no token" },
+        { status: 401 }
+      );
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+      
+      const user = await User.findById(decoded.id);
+      if (!user) {
+        return NextResponse.json(
+          { success: false, message: "User not found" },
+          { status: 404 }
+        );
+      }
+
+      // Delete associated stats and submissions
+      await UserStats.deleteMany({ userId: decoded.id });
+      await Submission.deleteMany({ userId: decoded.id });
+      await TopicStat.deleteMany({ userId: decoded.id });
+
+      // Delete user
+      await User.findByIdAndDelete(decoded.id);
+
+      return NextResponse.json({
+        success: true,
+        message: "Account deleted successfully"
+      });
+    } catch (err) {
+      console.error("Token verification error:", err);
+      return NextResponse.json(
+        { success: false, message: "Not authorized, token failed" },
+        { status: 401 }
+      );
+    }
+  } catch (error) {
+    console.error("Delete account error:", error);
+    return NextResponse.json(
+      { success: false, message: error.message || "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
