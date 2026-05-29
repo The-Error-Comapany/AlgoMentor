@@ -26,7 +26,7 @@ import {
 import "./DashboardLayout.css";
 
 function DashboardLayout({ children }) {
-  const { logout, user } = useAuth();
+  const { logout, user, setUser } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -50,15 +50,22 @@ function DashboardLayout({ children }) {
         
         if (Array.isArray(contestsData)) {
           const now = new Date();
-          const upcoming = contestsData.filter(c => new Date(c.startTime) > now).slice(0, 3);
+          // Keep contests until they end (startTime + duration in ms > now)
+          const upcoming = contestsData.filter(c => {
+             const durationMs = (c.duration || 0) * 1000;
+             return new Date(c.startTime).getTime() + durationMs > now.getTime();
+          }).slice(0, 3);
           
           upcoming.forEach(c => {
+            const contestId = `contest_${c._id || c.slug || idCounter++}`;
+            const isRead = user.readContests?.includes(contestId);
             notifs.push({
-              id: idCounter++,
+              id: contestId,
+              type: 'contest',
               title: "Upcoming Contest",
               desc: `${c.name} on ${c.platform.charAt(0).toUpperCase() + c.platform.slice(1)}.`,
               time: new Date(c.startTime).toLocaleString(),
-              unread: true,
+              unread: !isRead,
               icon: <Calendar size={16} />
             });
           });
@@ -76,14 +83,18 @@ function DashboardLayout({ children }) {
           
           if (totalSolved >= 100) {
             const milestone = Math.floor(totalSolved / 100) * 100;
-            notifs.push({
-              id: idCounter++,
-              title: "Achievement Unlocked! 🏆",
-              desc: `You crossed ${milestone} problems solved! Keep it up!`,
-              time: "Just now",
-              unread: true,
-              icon: <Brain size={16} />
-            });
+            const milestoneId = `milestone_${milestone}`;
+            if (!user.readAchievements?.includes(milestoneId)) {
+              notifs.push({
+                id: milestoneId,
+                type: 'achievement',
+                title: "Achievement Unlocked! 🏆",
+                desc: `You crossed ${milestone} problems solved! Keep it up!`,
+                time: "Just now",
+                unread: true,
+                icon: <Brain size={16} />
+              });
+            }
           }
         }
         
@@ -108,6 +119,18 @@ function DashboardLayout({ children }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        router.push("/problems");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [router]);
 
   const handleLogout = async () => {
     try {
@@ -148,8 +171,99 @@ function DashboardLayout({ children }) {
     setSidebarOpen(false); // Close mobile menu drawer on click
   };
 
-  const markAllRead = () => {
-    setNotifications([]);
+  const markAllRead = async () => {
+    const unreadNotifs = notifications.filter(n => n.unread);
+    if (unreadNotifs.length === 0) return;
+
+    // Optimistic update
+    setNotifications(prev => prev.map(n => ({ ...n, unread: false })).filter(n => n.type !== 'achievement'));
+
+    try {
+      const token = localStorage.getItem("accessToken");
+      const currentReadAchievements = new Set(user?.readAchievements || []);
+      const currentReadContests = new Set(user?.readContests || []);
+      
+      let hasChanges = false;
+      
+      unreadNotifs.forEach(n => {
+        if (n.type === 'achievement') {
+          if (!currentReadAchievements.has(n.id)) {
+            currentReadAchievements.add(n.id);
+            hasChanges = true;
+          }
+        } else if (n.type === 'contest') {
+          if (!currentReadContests.has(n.id)) {
+            currentReadContests.add(n.id);
+            hasChanges = true;
+          }
+        }
+      });
+
+      if (hasChanges) {
+        const payload = {};
+        if (currentReadAchievements.size > 0) payload.readAchievements = Array.from(currentReadAchievements);
+        if (currentReadContests.size > 0) payload.readContests = Array.from(currentReadContests);
+
+        const res = await fetch("/api/auth/me", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to mark all notifications as read", err);
+    }
+  };
+
+  const markAsRead = async (id, type) => {
+    // Optimistic update
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n).filter(n => {
+       if (n.id === id && n.type === 'achievement') return false; // Hide read achievements immediately
+       return true;
+    }));
+
+    try {
+      const token = localStorage.getItem("accessToken");
+      const currentReadAchievements = user?.readAchievements || [];
+      const currentReadContests = user?.readContests || [];
+      
+      const payload = {};
+      if (type === "achievement") {
+        if (!currentReadAchievements.includes(id)) {
+          payload.readAchievements = [...currentReadAchievements, id];
+        }
+      } else if (type === "contest") {
+        if (!currentReadContests.includes(id)) {
+          payload.readContests = [...currentReadContests, id];
+        }
+      }
+
+      if (Object.keys(payload).length > 0) {
+        const res = await fetch("/api/auth/me", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to mark notification as read", err);
+    }
   };
 
   const unreadCount = notifications.filter(n => n.unread).length;
@@ -221,7 +335,7 @@ function DashboardLayout({ children }) {
               <input
                 className="db-search-input"
                 type="text"
-                placeholder="Search problems, contests..."
+                placeholder="Search problems..."
                 readOnly
                 onClick={() => router.push("/problems")}
               />
@@ -260,6 +374,15 @@ function DashboardLayout({ children }) {
                             <span className="db-notif-desc">{n.desc}</span>
                             <span className="db-notif-time">{n.time}</span>
                           </div>
+                          {n.unread && (
+                            <button 
+                               className="db-notif-read-btn" 
+                               onClick={(e) => { e.stopPropagation(); markAsRead(n.id, n.type); }}
+                               title="Mark as read"
+                            >
+                               <CheckCircle size={14} />
+                            </button>
+                          )}
                         </div>
                       ))
                     )}

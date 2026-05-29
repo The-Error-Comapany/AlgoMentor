@@ -80,7 +80,7 @@ export async function PUT(req) {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-      const { name, email, lcHandle, cfHandle, weeklyGoalTarget } = await req.json();
+      const { name, email, lcHandle, cfHandle, weeklyGoalTarget, readAchievements, readContests } = await req.json();
 
       const updateData = {};
       if (name !== undefined) updateData.name = name;
@@ -88,6 +88,8 @@ export async function PUT(req) {
       if (lcHandle !== undefined) updateData.lcHandle = lcHandle;
       if (cfHandle !== undefined) updateData.cfHandle = cfHandle;
       if (weeklyGoalTarget !== undefined) updateData.weeklyGoalTarget = weeklyGoalTarget;
+      if (readAchievements !== undefined) updateData.readAchievements = readAchievements;
+      if (readContests !== undefined) updateData.readContests = readContests;
 
       if (lcHandle === "") {
         console.log(`Clearing LeetCode stats for unlinked user ${decoded.id}`);

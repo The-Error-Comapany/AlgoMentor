@@ -90,7 +90,7 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <form onSubmit={handleSubmit} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div style={{ position: "relative" }}>
             <Mail size={16} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
             <input
@@ -100,6 +100,7 @@ export default function Login() {
               value={form.email}
               onChange={handleChange}
               style={{ paddingLeft: "2.75rem" }}
+              autoComplete="off"
               required
             />
           </div>
@@ -113,6 +114,7 @@ export default function Login() {
               value={form.password}
               onChange={handleChange}
               style={{ paddingLeft: "2.75rem" }}
+              autoComplete="new-password"
               required
             />
           </div>

@@ -241,6 +241,12 @@
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   color: var(--text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.db-search-mock:hover .db-search-shortcut {
+  opacity: 1;
 }
 
 /* Extension status indicator */
@@ -501,4 +507,23 @@
   .db-search-mock {
     display: none; /* Hide mock search bar on small screens to save space */
   }
+}
+
+.db-notif-read-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  margin-left: auto;
+}
+
+.db-notif-read-btn:hover {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.1);
 }

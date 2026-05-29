@@ -272,7 +272,18 @@ function SettingsContent() {
                   />
                   
                   {syncStatus.leetcode === "verified" ? (
-                    <button className="btn btn-danger btn-sm" style={{ padding: "0 1rem", fontSize: "0.75rem" }} onClick={() => handleUnlink("leetcode")}>Unlink</button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button 
+                        className="btn btn-primary btn-sm" 
+                        style={{ padding: "0 1rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }} 
+                        onClick={() => handleVerifySync("leetcode")}
+                        disabled={loadingPlatform === "leetcode"}
+                      >
+                        {loadingPlatform === "leetcode" ? <RefreshCw size={12} className="pulse-green" /> : <RefreshCw size={12} />}
+                        <span>Sync</span>
+                      </button>
+                      <button className="btn btn-danger btn-sm" style={{ padding: "0 1rem", fontSize: "0.75rem" }} onClick={() => handleUnlink("leetcode")}>Unlink</button>
+                    </div>
                   ) : (
                     <button
                       className="btn btn-primary btn-sm"
@@ -311,7 +322,18 @@ function SettingsContent() {
                   />
 
                   {syncStatus.codeforces === "verified" ? (
-                    <button className="btn btn-danger btn-sm" style={{ padding: "0 1rem", fontSize: "0.75rem" }} onClick={() => handleUnlink("codeforces")}>Unlink</button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button 
+                        className="btn btn-primary btn-sm" 
+                        style={{ padding: "0 1rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }} 
+                        onClick={() => handleVerifySync("codeforces")}
+                        disabled={loadingPlatform === "codeforces"}
+                      >
+                        {loadingPlatform === "codeforces" ? <RefreshCw size={12} className="pulse-green" /> : <RefreshCw size={12} />}
+                        <span>Sync</span>
+                      </button>
+                      <button className="btn btn-danger btn-sm" style={{ padding: "0 1rem", fontSize: "0.75rem" }} onClick={() => handleUnlink("codeforces")}>Unlink</button>
+                    </div>
                   ) : (
                     <button
                       className="btn btn-primary btn-sm"

@@ -9,8 +9,10 @@ export async function GET(request: NextRequest) {
     await connectDB();
     const now = new Date();
     
-    // Fetch upcoming contests starting now or in the future
-    let contests = await Contest.find({ startTime: { $gte: now } })
+    const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    // Fetch upcoming and recently started contests
+    let contests = await Contest.find({ startTime: { $gte: lastWeek } })
       .sort({ startTime: 1 });
 
     // Check if we need to sync: we do a sync if we have no upcoming contests in the database
@@ -80,7 +82,7 @@ export async function GET(request: NextRequest) {
         if (syncPromises.length > 0) {
           await Promise.all(syncPromises);
           // Re-fetch upcoming contests after syncing
-          contests = await Contest.find({ startTime: { $gte: now } })
+          contests = await Contest.find({ startTime: { $gte: lastWeek } })
             .sort({ startTime: 1 });
         }
       } catch (syncErr) {

@@ -47,6 +47,14 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 10,
     },
+    readAchievements: {
+      type: [String],
+      default: [],
+    },
+    readContests: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -70,6 +78,7 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 // ---------------- MODEL ----------------
 // Prevent compilation errors on hot reload in Next.js
-const User = mongoose.models.User || mongoose.model("User", userSchema);
+delete mongoose.models.User;
+const User = mongoose.model("User", userSchema);
 
 export default User;
