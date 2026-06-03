@@ -180,27 +180,20 @@ function DashboardContent() {
       .map(s => new Date(s.timestamp).toDateString())
   );
 
-  // Calculate weekly goal progress (accepted submissions in the last 7 days vs user target)
-  const last7DaysAccepted = [...solvedDates].filter(d => {
-    const date = new Date(d);
-    const diff = (today - date) / (1000 * 60 * 60 * 24);
-    return diff <= 7;
-  }).length;
-
+  // Calculate weekly goal progress using backend-computed weeklySolved
+  const weeklyProblemsSolved = (lcStats?.weeklySolved || 0) + (cfStats?.weeklySolved || 0);
   const weeklyGoalTarget = user?.weeklyGoalTarget || 10;
-  const weeklyGoalPercent = Math.min(100, Math.round((last7DaysAccepted / weeklyGoalTarget) * 100));
+  const weeklyGoalPercent = Math.min(100, Math.round((weeklyProblemsSolved / weeklyGoalTarget) * 100));
 
-  // Calculate streak from submissions
-  const calculateStreak = (subs) => {
-    if (!subs || subs.length === 0) return 0;
+  // Calculate combined streak from active dates synced from backend
+  const combinedActiveDates = new Set([
+    ...(lcStats?.activeDates || []),
+    ...(cfStats?.activeDates || [])
+  ]);
+
+  const calculateCombinedStreak = (datesSet) => {
+    if (datesSet.size === 0) return 0;
     
-    // Extract unique dates of accepted submissions in local timezone
-    const solvedDates = new Set(
-      subs
-        .filter(s => s.verdict.toLowerCase() === "accepted" || s.verdict.toLowerCase() === "ok")
-        .map(s => new Date(s.timestamp).toDateString())
-    );
-
     let streak = 0;
     let checkDate = new Date();
     
@@ -208,14 +201,14 @@ function DashboardContent() {
     checkDate.setDate(checkDate.getDate() - 1);
     const yesterdayStr = checkDate.toDateString();
     
-    if (!solvedDates.has(todayStr) && !solvedDates.has(yesterdayStr)) {
+    if (!datesSet.has(todayStr) && !datesSet.has(yesterdayStr)) {
       return 0;
     }
     
     checkDate = new Date(); // Reset to today
     while (true) {
       const dateStr = checkDate.toDateString();
-      if (solvedDates.has(dateStr)) {
+      if (datesSet.has(dateStr)) {
         streak++;
         checkDate.setDate(checkDate.getDate() - 1);
       } else {
@@ -229,7 +222,7 @@ function DashboardContent() {
     return streak;
   };
 
-  const currentStreak = calculateStreak(activeSubmissions);
+  const currentStreak = calculateCombinedStreak(combinedActiveDates);
 
   // Find next upcoming contests
   const upcomingLC = contests
@@ -296,7 +289,7 @@ function DashboardContent() {
         <div style={{ width: "220px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "4px" }}>
             <span style={{ color: "var(--text-secondary)" }}>Weekly Goal Progress</span>
-            <span style={{ color: "white", fontWeight: "600" }}>{weeklyGoalPercent}% ({last7DaysAccepted}/{weeklyGoalTarget})</span>
+            <span style={{ color: "white", fontWeight: "600" }}>{weeklyGoalPercent}% ({weeklyProblemsSolved}/{weeklyGoalTarget})</span>
           </div>
           <div style={{ height: "6px", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }}>
             <div style={{ height: "100%", width: `${weeklyGoalPercent}%`, background: "var(--primary-gradient)", borderRadius: "4px", boxShadow: "0 0 10px rgba(99, 102, 241, 0.5)" }} />

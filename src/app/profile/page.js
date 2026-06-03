@@ -117,74 +117,146 @@ function ProfileContent() {
     Medium: { solved: mediumSolved, total: 500, percent: Math.min(100, Math.round((mediumSolved / 500) * 100)), color: "var(--warning)" },
     Hard: { solved: hardSolved, total: 200, percent: Math.min(100, Math.round((hardSolved / 200) * 100)), color: "var(--danger)" }
   };
+  // Map Codeforces specific tags to unified names
+  const tagMapping = {
+    "math": "Math",
+    "greedy": "Greedy",
+    "dp": "Dynamic Programming",
+    "implementation": "Implementation",
+    "data structures": "Data Structures",
+    "brute force": "Brute Force",
+    "constructive algorithms": "Constructive Algorithms",
+    "graphs": "Graph",
+    "sortings": "Sorting",
+    "binary search": "Binary Search",
+    "dfs and similar": "Depth-First Search",
+    "trees": "Tree",
+    "strings": "String",
+    "number theory": "Number Theory",
+    "combinatorics": "Combinatorics",
+    "geometry": "Geometry",
+    "bitmasks": "Bit Manipulation",
+    "two pointers": "Two Pointers",
+    "dsu": "Union-Find",
+    "shortest paths": "Shortest Path"
+  };
+
+  // Combine topics from both platforms
+  const combinedTopicsMap = {};
+  activeTopics.forEach(t => {
+    // Check if the topic exists in our mapping, else title case it
+    let normalizedName = t.topic;
+    if (tagMapping[t.topic.toLowerCase()]) {
+      normalizedName = tagMapping[t.topic.toLowerCase()];
+    } else {
+      normalizedName = t.topic.charAt(0).toUpperCase() + t.topic.slice(1);
+    }
+
+    if (!combinedTopicsMap[normalizedName]) {
+      combinedTopicsMap[normalizedName] = {
+        topic: normalizedName,
+        count: 0,
+        platform: t.platform
+      };
+    }
+    
+    combinedTopicsMap[normalizedName].count += t.count;
+    if (combinedTopicsMap[normalizedName].platform !== t.platform) {
+      combinedTopicsMap[normalizedName].platform = "mixed";
+    }
+  });
+
+  const combinedTopics = Object.values(combinedTopicsMap);
+
+  // Approximate total problems available per combined topic (LC + CF roughly)
+  const COMBINED_TOPIC_TOTALS = {
+    "Array": 1750,
+    "String": 730 + 700, // 1430
+    "Hash Table": 600,
+    "Math": 550 + 2500, // 3050
+    "Dynamic Programming": 520 + 2000, // 2520
+    "Sorting": 400 + 1000, // 1400
+    "Greedy": 360 + 2200, // 2560
+    "Depth-First Search": 310 + 800, // 1110
+    "Binary Search": 280 + 900, // 1180
+    "Tree": 230 + 800, // 1030
+    "Breadth-First Search": 230,
+    "Matrix": 220,
+    "Two Pointers": 200 + 400, // 600
+    "Bit Manipulation": 190 + 400, // 590
+    "Stack": 160,
+    "Graph": 150 + 1000, // 1150
+    "Implementation": 3000,
+    "Data Structures": 1500,
+    "Brute Force": 1300,
+    "Constructive Algorithms": 1200,
+    "Number Theory": 600,
+    "Combinatorics": 500,
+    "Geometry": 400,
+    "Union-Find": 300,
+    "Shortest Path": 200
+  };
 
   // Group topics for progress bar display
-  const topicDistribution = [...activeTopics]
+  const topicDistribution = [...combinedTopics]
     .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
+    .slice(0, 15)
     .map(t => {
-      const estimatedMax = Math.max(50, Math.ceil(t.count / 20) * 20);
+      // Use predefined total if available, otherwise fallback to user's count * 1.5 (or min 50)
+      const maxAvailable = COMBINED_TOPIC_TOTALS[t.topic] || Math.max(50, Math.ceil(t.count * 1.5));
       return {
         topic: t.topic,
         solved: t.count,
-        max: estimatedMax,
+        max: maxAvailable,
         color: t.platform === "leetcode"
           ? "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)"
-          : "linear-gradient(90deg, #318dec 0%, #2563eb 100%)"
+          : t.platform === "codeforces"
+          ? "linear-gradient(90deg, #318dec 0%, #2563eb 100%)"
+          : "linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%)" // Mixed color (purple to indigo)
       };
     });
 
   // Strengths & Weaknesses tags
-  const sortedTopics = [...activeTopics].sort((a, b) => b.count - a.count);
-  const strengthTags = sortedTopics.slice(0, 3).map(t => t.topic);
-  const weaknessTags = sortedTopics.slice(-3).reverse().map(t => t.topic);
+  const sortedTopics = [...combinedTopics].sort((a, b) => b.count - a.count);
+  const strengthTags = sortedTopics.slice(0, 10).map(t => t.topic);
+  const weaknessTags = sortedTopics.slice(-10).reverse().map(t => t.topic);
 
   // SVG Ratings history calculations
-  const getCFChartPoints = () => {
-    const history = cfStats?.ratingHistory || [];
-    if (history.length === 0) return [];
+  const getChartPoints = () => {
+    const lcHistory = (lcStats?.ratingHistory || []).slice(-6);
+    const cfHistory = (cfStats?.ratingHistory || []).slice(-6);
     
-    const last6 = history.slice(-6);
-    const ratings = last6.map(h => h.rating);
-    const minR = Math.min(...ratings);
-    const maxR = Math.max(...ratings);
+    if (lcHistory.length === 0 && cfHistory.length === 0) {
+      return { chartPointsLC: [], chartPointsCF: [] };
+    }
+    
+    const allRatings = [
+      ...lcHistory.map((h) => h.rating),
+      ...cfHistory.map((h) => h.rating)
+    ];
+    
+    const minR = Math.min(...allRatings);
+    const maxR = Math.max(...allRatings);
     const range = maxR - minR || 1;
 
-    return last6.map((h, idx) => {
+    const mapPoints = (history) => history.map((h, idx) => {
       const x = 50 + idx * 100;
       const y = 160 - ((h.rating - minR) / range) * 120;
       return {
-        label: `Contest ${idx + 1}`,
+        label: `C${idx + 1}`,
         rating: h.rating,
         x,
         y
       };
     });
+
+    return {
+      chartPointsLC: mapPoints(lcHistory),
+      chartPointsCF: mapPoints(cfHistory)
+    };
   };
 
-  const getLCChartPoints = () => {
-    const rating = lcStats?.rating;
-    if (!rating) return [];
-    
-    // Generate simulated progression line ending at current LeetCode rating
-    const startRating = Math.round(rating * 0.95);
-    const points = [];
-    for (let i = 0; i < 6; i++) {
-      const r = Math.round(startRating + (rating - startRating) * (i / 5));
-      const x = 50 + i * 100;
-      const y = 140 - (i * 12);
-      points.push({
-        label: `Contest ${i + 1}`,
-        rating: r,
-        x,
-        y
-      });
-    }
-    return points;
-  };
-
-  const chartPointsCF = getCFChartPoints();
-  const chartPointsLC = getLCChartPoints();
+  const { chartPointsLC, chartPointsCF } = getChartPoints();
 
   if (loadingUser) {
     return (
@@ -450,7 +522,7 @@ function ProfileContent() {
         <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <h3 style={{ fontSize: "1.1rem", margin: "0" }}>Topic-wise Solved Distribution</h3>
           
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", padding: "0.25rem 0" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", padding: "0.25rem 0", maxHeight: "400px", overflowY: "auto", paddingRight: "10px" }} className="custom-scrollbar">
             {topicDistribution.length > 0 ? (
               topicDistribution.map((t) => (
                 <div key={t.topic}>
@@ -594,6 +666,21 @@ function ProfileContent() {
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.02);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.1);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255,255,255,0.2);
         }
       `}</style>
 

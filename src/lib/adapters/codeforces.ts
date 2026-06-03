@@ -32,15 +32,37 @@ export async function fetchCFSubmissions(handle: string, count: number = 20) {
   return await fetchCF(`user.status?handle=${handle}&count=${count}`);
 }
 
-export async function computeCFTopicStats(handle: string): Promise<Record<string, number>> {
+export async function computeCFTopicStats(handle: string): Promise<{ topicStats: Record<string, number>, activeDates: string[], weeklySolved: number }> {
   const submissions = await fetchCF(`user.status?handle=${handle}&count=1000`);
   const acceptedUnique = new Map<string, string[]>(); // Map problemKey -> tags[]
+  const activeDatesSet = new Set<string>();
+  
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  const day = startOfWeek.getDay();
+  const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+  startOfWeek.setDate(diff);
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  let weeklySolved = 0;
 
   for (const sub of submissions) {
     if (sub.verdict === "OK" && sub.problem) {
       const problemKey = `${sub.problem.contestId}-${sub.problem.index}`;
+      
+      let isNewUnique = false;
       if (!acceptedUnique.has(problemKey)) {
         acceptedUnique.set(problemKey, sub.problem.tags || []);
+        isNewUnique = true;
+      }
+      
+      if (sub.creationTimeSeconds) {
+        const date = new Date(sub.creationTimeSeconds * 1000);
+        activeDatesSet.add(date.toDateString());
+        
+        if (isNewUnique && date >= startOfWeek) {
+          weeklySolved++;
+        }
       }
     }
   }
@@ -52,7 +74,7 @@ export async function computeCFTopicStats(handle: string): Promise<Record<string
     }
   }
 
-  return tagCounts;
+  return { topicStats: tagCounts, activeDates: Array.from(activeDatesSet), weeklySolved };
 }
 
 export async function fetchCFUpcomingContests() {

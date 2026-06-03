@@ -57,9 +57,46 @@ export async function POST(request: NextRequest) {
         const mediumSolved = acNums.find((n: any) => n.difficulty === "Medium")?.count || 0;
         const hardSolved = acNums.find((n: any) => n.difficulty === "Hard")?.count || 0;
 
-        const rating = contestRating?.rating ? Math.round(contestRating.rating) : undefined;
+        const rating = contestRating?.ranking?.rating ? Math.round(contestRating.ranking.rating) : undefined;
         const ranking = stats.profile?.ranking || undefined;
-        const contestsAttended = contestRating?.attendedContestsCount || 0;
+        const contestsAttended = contestRating?.ranking?.attendedContestsCount || 0;
+
+        // Process LeetCode Rating History
+        const lcHistory = (contestRating?.history || [])
+          .filter((h: any) => h.attended)
+          .map((h: any) => ({
+            contestName: h.contest?.title || "Contest",
+            rating: Math.round(h.rating),
+            date: new Date(h.contest?.startTime * 1000)
+          }));
+
+        // Extract LeetCode active dates and streak
+        let lcActiveDates: string[] = [];
+        let weeklySolved = 0;
+        const streak = stats.userCalendar?.streak || 0;
+
+        if (stats.userCalendar?.submissionCalendar) {
+          try {
+            const cal = JSON.parse(stats.userCalendar.submissionCalendar);
+            const now = new Date();
+            const startOfWeek = new Date(now);
+            const day = startOfWeek.getDay();
+            const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is sunday
+            startOfWeek.setDate(diff);
+            startOfWeek.setHours(0, 0, 0, 0);
+
+            for (const [timestamp, count] of Object.entries(cal)) {
+              const date = new Date(parseInt(timestamp) * 1000);
+              lcActiveDates.push(date.toDateString());
+              
+              if (date >= startOfWeek) {
+                weeklySolved += (count as number);
+              }
+            }
+          } catch (e) {
+            console.error("Failed to parse LC submission calendar", e);
+          }
+        }
 
         // Upsert UserStats
         await UserStats.findOneAndUpdate(
@@ -74,6 +111,10 @@ export async function POST(request: NextRequest) {
             rating,
             ranking,
             contestsAttended,
+            ratingHistory: lcHistory,
+            streak,
+            weeklySolved,
+            activeDates: lcActiveDates,
             lastSynced: new Date(),
           },
           { upsert: true, new: true }
@@ -139,9 +180,9 @@ export async function POST(request: NextRequest) {
         }),
         computeCFTopicStats(cfHandle).catch((err) => {
           console.error(`Error computing CF Topic Stats for ${cfHandle}:`, err);
-          return {};
+          return { topicStats: {}, activeDates: [], weeklySolved: 0 };
         }),
-      ]).then(async ([user, ratingHistory, submissions, topicStats]) => {
+      ]).then(async ([user, ratingHistory, submissions, { topicStats, activeDates, weeklySolved }]) => {
         if (!user) return;
 
         // 1. Process Rating History & UserStats
@@ -163,6 +204,8 @@ export async function POST(request: NextRequest) {
             rank: user.rank,
             solved,
             ratingHistory: formattedHistory,
+            weeklySolved,
+            activeDates: activeDates || [],
             lastSynced: new Date(),
           },
           { upsert: true, new: true }

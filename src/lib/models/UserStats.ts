@@ -19,6 +19,9 @@ export interface IUserStats extends Document {
   ranking?: number;
   contestsAttended?: number;
   ratingHistory: IRatingHistory[];
+  streak?: number;
+  weeklySolved?: number;
+  activeDates?: string[];
   lastSynced: Date;
 }
 
@@ -41,6 +44,9 @@ const UserStatsSchema = new Schema<IUserStats>({
       date: { type: Date, required: true },
     },
   ],
+  streak: { type: Number },
+  weeklySolved: { type: Number },
+  activeDates: [{ type: String }],
   lastSynced: { type: Date, default: Date.now },
 });
 

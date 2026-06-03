@@ -29,6 +29,10 @@ export async function fetchLCStats(username: string) {
         submitStats {
           acSubmissionNum { difficulty count }
         }
+        userCalendar {
+          streak
+          submissionCalendar
+        }
       }
     }
   `;
@@ -70,10 +74,21 @@ export async function fetchLCContestRating(username: string) {
       userContestRanking(username: $username) {
         rating globalRanking attendedContestsCount
       }
+      userContestRankingHistory(username: $username) {
+        attended
+        rating
+        contest {
+          title
+          startTime
+        }
+      }
     }
   `;
   const data = await queryLeetCode(query, { username });
-  return data?.userContestRanking || null;
+  return {
+    ranking: data?.userContestRanking || null,
+    history: data?.userContestRankingHistory || []
+  };
 }
 
 export async function fetchLCPOTD() {
