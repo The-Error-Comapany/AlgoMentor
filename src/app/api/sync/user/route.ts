@@ -180,9 +180,9 @@ export async function POST(request: NextRequest) {
         }),
         computeCFTopicStats(cfHandle).catch((err) => {
           console.error(`Error computing CF Topic Stats for ${cfHandle}:`, err);
-          return { topicStats: {}, activeDates: [], weeklySolved: 0 };
+          return { topicStats: {}, activeDates: [], weeklySolved: 0, totalUniqueSolved: 0 };
         }),
-      ]).then(async ([user, ratingHistory, submissions, { topicStats, activeDates, weeklySolved }]) => {
+      ]).then(async ([user, ratingHistory, submissions, { topicStats, activeDates, weeklySolved, totalUniqueSolved }]) => {
         if (!user) return;
 
         // 1. Process Rating History & UserStats
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
           date: new Date(h.ratingUpdateTimeSeconds * 1000),
         }));
 
-        const solved = Object.values(topicStats || {}).reduce((sum: number, count: any) => sum + (count || 0), 0);
+        const solved = totalUniqueSolved;
 
         await UserStats.findOneAndUpdate(
           { userId, platform: "codeforces" },

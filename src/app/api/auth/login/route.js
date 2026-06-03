@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import connectDB from "@/utils/db";
 import User from "@/models/User";
 import { generateAccessToken, generateRefreshToken } from "@/utils/generateToken";
+import { POST as syncGlobalContests } from "@/app/api/sync/global/route";
 
 export async function POST(req) {
   try {
@@ -59,6 +60,11 @@ export async function POST(req) {
       maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
       path: "/",
     });
+
+    // Trigger background contest sync on login (fire-and-forget)
+    syncGlobalContests(new Request("http://localhost/api/sync/global", { method: "POST" })).catch((err) =>
+      console.error("Background sync on login failed:", err)
+    );
 
     return NextResponse.json({
       success: true,

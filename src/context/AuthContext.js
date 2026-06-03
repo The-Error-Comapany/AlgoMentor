@@ -23,13 +23,18 @@ export const AuthProvider = ({ children }) => {
           setAccessToken(null);
           setUser(null);
         } else {
-          const data = await res.json();
-          if (data.success && data.user) {
-            setUser(data.user);
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await res.json();
+            if (data.success && data.user) {
+              setUser(data.user);
+            } else {
+              localStorage.removeItem("accessToken");
+              setAccessToken(null);
+              setUser(null);
+            }
           } else {
-            localStorage.removeItem("accessToken");
-            setAccessToken(null);
-            setUser(null);
+            console.error("Auth /me returned non-JSON response");
           }
         }
       } catch (err) {
@@ -58,9 +63,14 @@ export const AuthProvider = ({ children }) => {
           "Authorization": `Bearer ${token}`
         }
       });
-      const data = await res.json();
-      if (data.success && data.user) {
-        setUser(data.user);
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+        }
+      } else {
+        console.error("Auth /me returned non-JSON response during login");
       }
     } catch (err) {
       console.error("Error fetching user data during login:", err);

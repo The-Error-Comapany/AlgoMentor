@@ -46,54 +46,58 @@ function DashboardLayout({ children }) {
         
         // Fetch upcoming contests
         const contestsRes = await fetch("/api/contests");
-        const contestsData = await contestsRes.json();
-        
-        if (Array.isArray(contestsData)) {
-          const now = new Date();
-          // Keep contests until they end (startTime + duration in ms > now)
-          const upcoming = contestsData.filter(c => {
-             const durationMs = (c.duration || 0) * 1000;
-             return new Date(c.startTime).getTime() + durationMs > now.getTime();
-          }).slice(0, 3);
-          
-          upcoming.forEach(c => {
-            const contestId = `contest_${c._id || c.slug || idCounter++}`;
-            const isRead = user.readContests?.includes(contestId);
-            notifs.push({
-              id: contestId,
-              type: 'contest',
-              title: "Upcoming Contest",
-              desc: `${c.name} on ${c.platform.charAt(0).toUpperCase() + c.platform.slice(1)}.`,
-              time: new Date(c.startTime).toLocaleString(),
-              unread: !isRead,
-              icon: <Calendar size={16} />
+        const ctType = contestsRes.headers.get("content-type");
+        if (ctType && ctType.includes("application/json")) {
+          const contestsData = await contestsRes.json();
+          if (Array.isArray(contestsData)) {
+            const now = new Date();
+            // Keep contests until they end (startTime + duration in ms > now)
+            const upcoming = contestsData.filter(c => {
+               const durationMs = (c.duration || 0) * 1000;
+               return new Date(c.startTime).getTime() + durationMs > now.getTime();
+            }).slice(0, 3);
+            
+            upcoming.forEach(c => {
+              const contestId = `contest_${c._id || c.slug || idCounter++}`;
+              const isRead = user.readContests?.includes(contestId);
+              notifs.push({
+                id: contestId,
+                type: 'contest',
+                title: "Upcoming Contest",
+                desc: `${c.name} on ${c.platform.charAt(0).toUpperCase() + c.platform.slice(1)}.`,
+                time: new Date(c.startTime).toLocaleString(),
+                unread: !isRead,
+                icon: <Calendar size={16} />
+              });
             });
-          });
+          }
         }
         
         // Fetch user stats for achievements
         const statsRes = await fetch(`/api/user/stats?userId=${user._id}`);
-        const statsData = await statsRes.json();
-        
-        if (Array.isArray(statsData)) {
-          let totalSolved = 0;
-          statsData.forEach(s => {
-            totalSolved += (s.solved || 0);
-          });
-          
-          if (totalSolved >= 100) {
-            const milestone = Math.floor(totalSolved / 100) * 100;
-            const milestoneId = `milestone_${milestone}`;
-            if (!user.readAchievements?.includes(milestoneId)) {
-              notifs.push({
-                id: milestoneId,
-                type: 'achievement',
-                title: "Achievement Unlocked! 🏆",
-                desc: `You crossed ${milestone} problems solved! Keep it up!`,
-                time: "Just now",
-                unread: true,
-                icon: <Brain size={16} />
-              });
+        const stType = statsRes.headers.get("content-type");
+        if (stType && stType.includes("application/json")) {
+          const statsData = await statsRes.json();
+          if (Array.isArray(statsData)) {
+            let totalSolved = 0;
+            statsData.forEach(s => {
+              totalSolved += (s.solved || 0);
+            });
+            
+            if (totalSolved >= 100) {
+              const milestone = Math.floor(totalSolved / 100) * 100;
+              const milestoneId = `milestone_${milestone}`;
+              if (!user.readAchievements?.includes(milestoneId)) {
+                notifs.push({
+                  id: milestoneId,
+                  type: 'achievement',
+                  title: "Achievement Unlocked! 🏆",
+                  desc: `You crossed ${milestone} problems solved! Keep it up!`,
+                  time: "Just now",
+                  unread: true,
+                  icon: <Brain size={16} />
+                });
+              }
             }
           }
         }

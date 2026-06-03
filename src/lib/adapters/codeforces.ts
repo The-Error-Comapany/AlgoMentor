@@ -32,8 +32,8 @@ export async function fetchCFSubmissions(handle: string, count: number = 20) {
   return await fetchCF(`user.status?handle=${handle}&count=${count}`);
 }
 
-export async function computeCFTopicStats(handle: string): Promise<{ topicStats: Record<string, number>, activeDates: string[], weeklySolved: number }> {
-  const submissions = await fetchCF(`user.status?handle=${handle}&count=1000`);
+export async function computeCFTopicStats(handle: string): Promise<{ topicStats: Record<string, number>, activeDates: string[], weeklySolved: number, totalUniqueSolved: number }> {
+  const submissions = await fetchCF(`user.status?handle=${handle}&count=10000`);
   const acceptedUnique = new Map<string, string[]>(); // Map problemKey -> tags[]
   const activeDatesSet = new Set<string>();
   
@@ -74,7 +74,7 @@ export async function computeCFTopicStats(handle: string): Promise<{ topicStats:
     }
   }
 
-  return { topicStats: tagCounts, activeDates: Array.from(activeDatesSet), weeklySolved };
+  return { topicStats: tagCounts, activeDates: Array.from(activeDatesSet), weeklySolved, totalUniqueSolved: acceptedUnique.size };
 }
 
 export async function fetchCFUpcomingContests() {

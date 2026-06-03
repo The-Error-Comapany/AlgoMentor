@@ -103,9 +103,8 @@ function ProfileContent() {
   const lcMedium = lcStats?.mediumSolved || 0;
   const lcHard = lcStats?.hardSolved || 0;
 
-  // Codeforces solved can be calculated from topics or default to submissions count
-  const cfSolved = user?.cfHandle ? (activeTopics.filter(t => t.platform === "codeforces").reduce((sum, t) => sum + t.count, 0) || 
-                   activeSubmissions.filter(s => s.platform === "codeforces" && (s.verdict === "Accepted" || s.verdict === "OK")).length) : 0;
+  // Codeforces solved should use the precise totalUniqueSolved calculated by the backend
+  const cfSolved = cfStats?.solved || 0;
 
   const easySolved = lcEasy;
   const mediumSolved = lcMedium;

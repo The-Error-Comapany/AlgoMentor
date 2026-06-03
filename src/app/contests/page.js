@@ -17,18 +17,24 @@ function ContestsContent() {
     const fetchContests = async () => {
       try {
         const res = await fetch("/api/contests");
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const mapped = data.map((c) => ({
-            id: c._id || c.slug,
-            name: c.name,
-            platform: c.platform === "leetcode" ? "LeetCode" : "Codeforces",
-            start: c.startTime,
-            duration: `${Math.round(c.duration / 60)} mins`,
-            link: c.url,
-            dateDay: new Date(c.startTime).getDate()
-          }));
-          setContests(mapped);
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const mapped = data.map((c) => ({
+              id: c._id || c.slug,
+              name: c.name,
+              platform: c.platform === "leetcode" ? "LeetCode" : "Codeforces",
+              start: c.startTime,
+              duration: `${Math.round(c.duration / 60)} mins`,
+              durationMs: c.duration * 1000,
+              link: c.url,
+              dateDay: new Date(c.startTime).getDate()
+            }));
+            setContests(mapped);
+          }
+        } else {
+          console.error("Contests API returned non-JSON response");
         }
       } catch (err) {
         console.error("Error fetching contests:", err);
@@ -113,9 +119,11 @@ function ContestsContent() {
     if (!day) return [];
     return contests.filter(c => {
       const cDate = new Date(c.start);
-      return cDate.getFullYear() === now.getFullYear() &&
+      const isSameDay = cDate.getFullYear() === now.getFullYear() &&
              cDate.getMonth() === now.getMonth() &&
              cDate.getDate() === day;
+      const isEnded = new Date(c.start).getTime() + (c.durationMs || 0) < now.getTime();
+      return isSameDay && !isEnded;
     });
   };
 
@@ -154,7 +162,7 @@ function ContestsContent() {
               No upcoming contests found in database.
             </div>
           ) : (
-            contests.slice(0, 4).map((c) => {
+            contests.filter(c => new Date(c.start).getTime() + (c.durationMs || 0) >= now.getTime()).slice(0, 4).map((c) => {
               const isRem = reminders.some(r => r.id === c.id);
               const formattedDate = new Date(c.start).toLocaleDateString("en-US", {
                 weekday: "long", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
