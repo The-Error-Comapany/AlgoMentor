@@ -242,11 +242,11 @@ function DashboardLayout({ children }) {
       const payload = {};
       if (type === "achievement") {
         if (!currentReadAchievements.includes(id)) {
-          payload.readAchievements = [...currentReadAchievements, id];
+          payload.readAchievements = [...currentReadAchievements, id].slice(-50);
         }
       } else if (type === "contest") {
         if (!currentReadContests.includes(id)) {
-          payload.readContests = [...currentReadContests, id];
+          payload.readContests = [...currentReadContests, id].slice(-50);
         }
       }
 
