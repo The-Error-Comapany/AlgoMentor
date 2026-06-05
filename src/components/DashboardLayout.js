@@ -151,6 +151,9 @@ function DashboardLayout({ children }) {
     switch (pathname) {
       case "/dashboard": return "Dashboard";
       case "/problems": return "Problem Library";
+      case "/revision": return "Revision Hub";
+      case "/revision/session": return "Review Session";
+      case "/revision/analytics": return "Topic Revision Analytics";
       case "/contests": return "Contest Calendar";
       case "/mentor": return "AI Mentor Chat";
       case "/profile": return "Analytics Profile";
@@ -163,6 +166,7 @@ function DashboardLayout({ children }) {
   const menuItems = [
     { name: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
     { name: "Problems", path: "/problems", icon: <Code2 size={18} /> },
+    { name: "Revision Hub", path: "/revision", icon: <Brain size={18} /> },
     { name: "Contests", path: "/contests", icon: <Calendar size={18} /> },
     { name: "Profile", path: "/profile", icon: <User size={18} /> },
     { name: "Mentor", path: "/mentor", icon: <MessageSquareCode size={18} /> },
