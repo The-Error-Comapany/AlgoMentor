@@ -55,6 +55,10 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    maxReviewsPerDay: {
+      type: Number,
+      default: 10,
+    },
   },
   {
     timestamps: true,
