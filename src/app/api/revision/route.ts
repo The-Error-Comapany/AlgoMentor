@@ -144,9 +144,13 @@ export async function GET(req: NextRequest) {
     });
 
     // 3. Filter and partition into Queues
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+
     const allDueItems = itemsWithPriority.filter((item: any) => {
       const nextReview = new Date(item.nextReviewDate);
-      return nextReview <= now;
+      nextReview.setHours(0, 0, 0, 0); // Ignore stored time for legacy items
+      return nextReview.getTime() <= todayMidnight.getTime();
     });
 
     // Sort by Priority Score descending
@@ -256,6 +260,7 @@ export async function POST(req: NextRequest) {
 
     const nextReviewDate = new Date();
     nextReviewDate.setDate(nextReviewDate.getDate() + interval);
+    nextReviewDate.setHours(0, 0, 0, 0);
 
     // Create the revision item
     const newItem = new RevisionItem({
@@ -369,6 +374,7 @@ export async function PUT(req: NextRequest) {
 
     const nextReviewDate = new Date();
     nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
+    nextReviewDate.setHours(0, 0, 0, 0);
 
     // Update SM-2 parameters
     item.easinessFactor = newEF;
