@@ -2,7 +2,8 @@ import os
 import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEndpoint
 from langchain_core.prompts import PromptTemplate
@@ -21,88 +22,146 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class CardRequest(BaseModel):
+class QuickCardRequest(BaseModel):
     title: str
     difficulty: str
-    tags: list[str]
+    tags: List[str]
+    patternUsed: str
+    personalNotes: str
 
-# Define prompt template exactly as requested to output JSON
-TEMPLATE = """You are a Senior Technical Interview Coach. Create a structured interview revision card for the DSA problem.
+class SolutionCardRequest(BaseModel):
+    title: str
+    difficulty: str
+    tags: List[str]
+    programmingLanguage: str
+    solutionCode: str
+
+# No more fallback heuristics. We want to guarantee real AI output or fail loudly.
+
+def get_llm():
+    token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+    if not token or "placeholder" in token or "random" in token:
+        return None
+    repo_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    return HuggingFaceEndpoint(
+        repo_id=repo_id,
+        huggingfacehub_api_token=token,
+        temperature=0.1, # Extremely low temp for high focus and accuracy
+        max_new_tokens=800,
+        return_full_text=False
+    )
+
+QUICK_TEMPLATE = """You are a Senior Technical Interview Coach. Create a structured interview revision card strictly for the requested DSA problem.
+CRITICAL: Generate the summary EXACTLY for the provided problem. Do NOT hallucinate concepts from other topics or problems.
+
 Problem Title: {title}
 Difficulty: {difficulty}
 Tags: {tags}
+Algorithm Pattern Used: {patternUsed}
+User's Personal Notes: {personalNotes}
+
+Leverage your internal algorithmic knowledge about '{patternUsed}' and combine it seamlessly with the user's personal notes to generate a highly accurate, targeted summary for this specific problem.
 
 Respond with a strictly formatted JSON object. Do not include any markdown backticks, markdown styling, or text outside the JSON object.
 The JSON object must have exactly these keys:
 {{
-  "pattern": "Identify the standard algorithmic pattern (e.g. Sliding Window, DFS, Two Pointers, Unbounded Knapsack, etc.)",
+  "pattern": "Identify the standard algorithmic pattern (e.g. Sliding Window, DFS, etc.)",
   "coreIdea": "A 1-2 sentence description of the core logic/algorithm used to solve it.",
   "stateDefinition": "If DP, define the dp array/state; if other, define the key tracking structures/variables.",
   "transitionLogic": "Explain the step-by-step transition formula or loop lookup mechanism.",
   "timeComplexity": "Big-O runtime analysis.",
   "spaceComplexity": "Big-O space/memory analysis.",
-  "commonMistakes": "1-2 common bugs, edge cases, or sub-optimal traps for this problem.",
+  "commonMistakes": "1-2 common bugs, edge cases, or sub-optimal traps specifically for this problem.",
   "interviewInsights": "A tip or secret for coding interviews regarding this specific problem.",
   "relatedProblems": ["List 2-3 similar or extension problems"]
 }}
 JSON:"""
 
-# Fallback heuristic card
-def generate_heuristic_card(title: str, difficulty: str, tags: list[str]) -> dict:
-    primary_tag = tags[0] if tags else "General"
-    return {
-        "pattern": f"{primary_tag.upper()} / Dynamic Analysis",
-        "coreIdea": f"Solve the problem '{title}' by leveraging data structures or algorithms suitable for {primary_tag}.",
-        "stateDefinition": f"For {primary_tag} problems, define a search space, state parameters, or optimal sub-structures.",
-        "transitionLogic": "Construct the output step-by-step or combine results from sub-states iteratively.",
-        "timeComplexity": "O(N)" if difficulty.lower() == "easy" else ("O(N log N) or O(N)" if difficulty.lower() == "medium" else "O(N^2) or O(2^N)"),
-        "spaceComplexity": "O(1)" if difficulty.lower() == "easy" else "O(N) auxiliary space",
-        "commonMistakes": "1. Missing base case boundary checks.\n2. Incorrect array size index or stack overflow from deep recursion.",
-        "interviewInsights": "Be ready to explain the trade-offs between space and time complexity for this solution, and write code cleanly.",
-        "relatedProblems": ["Two Sum", "Coin Change", "Climbing Stairs"]
-    }
+SOLUTION_TEMPLATE = """You are a Senior Technical Interview Coach. Deeply analyze the provided solution code and create a structured interview revision card strictly for this DSA problem.
+CRITICAL: Generate the summary EXACTLY for the provided problem and code. Do NOT hallucinate concepts from other topics or problems.
 
-@app.post("/generate-card")
-async def generate_card(request: CardRequest):
-    token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+Problem Title: {title}
+Difficulty: {difficulty}
+Tags: {tags}
+Programming Language: {programmingLanguage}
+
+Solution Code:
+{solutionCode}
+
+Analyze the provided code carefully to extract the true time/space complexity, core approach, and edge case handling logic. Generate a highly accurate, targeted summary for this specific problem based purely on the code logic.
+
+Respond with a strictly formatted JSON object. Do not include any markdown backticks, markdown styling, or text outside the JSON object.
+The JSON object must have exactly these keys:
+{{
+  "pattern": "Identify the standard algorithmic pattern used in the code.",
+  "coreIdea": "A 1-2 sentence description of the core logic/algorithm implemented in the code.",
+  "stateDefinition": "If DP, define the dp array/state; if other, define the key tracking structures/variables seen in the code.",
+  "transitionLogic": "Explain the step-by-step transition formula or loop lookup mechanism used in the code.",
+  "timeComplexity": "Big-O runtime analysis based on the code loops.",
+  "spaceComplexity": "Big-O space/memory analysis based on the code structures.",
+  "commonMistakes": "1-2 common bugs, edge cases, or sub-optimal traps specifically for this problem.",
+  "interviewInsights": "A tip or secret for coding interviews regarding this specific problem.",
+  "relatedProblems": ["List 2-3 similar or extension problems"]
+}}
+JSON:"""
+
+import re
+
+def parse_json_response(response_text: str) -> dict:
+    text = response_text.strip()
+    # Use regex to find a JSON object in case there is conversational wrapper text
+    json_match = re.search(r'\{[\s\S]*\}', text)
+    if not json_match:
+        raise ValueError(f"No JSON object found in response: {text}")
     
-    if not token or "placeholder" in token or "random" in token:
-        print("Using local heuristic generator for card due to placeholder HuggingFace token.")
-        return generate_heuristic_card(request.title, request.difficulty, request.tags)
+    json_str = json_match.group(0)
+    return json.loads(json_str)
+
+@app.post("/generate-quick-card")
+async def generate_quick_card(request: QuickCardRequest):
+    llm = get_llm()
+    if not llm:
+        raise HTTPException(status_code=500, detail="HuggingFace token is missing or invalid.")
 
     try:
-        # We use a high quality open-source model: meta-llama/Llama-3-8B-Instruct
-        repo_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-        
-        llm = HuggingFaceEndpoint(
-            repo_id=repo_id,
-            huggingfacehub_api_token=token,
-            temperature=0.2,
-            max_new_tokens=800,
-            return_full_text=False
-        )
-
-        prompt = PromptTemplate.from_template(TEMPLATE)
+        prompt = PromptTemplate.from_template(QUICK_TEMPLATE)
         chain = prompt | llm
-
+        
         tags_str = ", ".join(request.tags)
         response_text = chain.invoke({
             "title": request.title,
             "difficulty": request.difficulty,
-            "tags": tags_str
+            "tags": tags_str,
+            "patternUsed": request.patternUsed,
+            "personalNotes": request.personalNotes
         })
-
-        # Strip markdown formatting if any was returned
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.replace("```json", "").replace("```", "").strip()
-
-        card = json.loads(text)
-        return card
-
+        return parse_json_response(response_text)
     except Exception as e:
-        print(f"Failed to generate AI card using HuggingFace. Falling back to heuristics. Error: {e}")
-        return generate_heuristic_card(request.title, request.difficulty, request.tags)
+        print(f"Failed to generate quick AI card. Error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI Generation Failed: {str(e)}")
+
+@app.post("/generate-solution-card")
+async def generate_solution_card(request: SolutionCardRequest):
+    llm = get_llm()
+    if not llm:
+        raise HTTPException(status_code=500, detail="HuggingFace token is missing or invalid.")
+
+    try:
+        prompt = PromptTemplate.from_template(SOLUTION_TEMPLATE)
+        chain = prompt | llm
+        
+        tags_str = ", ".join(request.tags)
+        response_text = chain.invoke({
+            "title": request.title,
+            "difficulty": request.difficulty,
+            "tags": tags_str,
+            "programmingLanguage": request.programmingLanguage,
+            "solutionCode": request.solutionCode
+        })
+        return parse_json_response(response_text)
+    except Exception as e:
+        print(f"Failed to generate solution AI card. Error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI Generation Failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
