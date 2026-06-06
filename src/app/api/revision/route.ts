@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db/mongoose";
 import RevisionItem from "@/lib/models/RevisionItem";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
-import { generateRevisionCard } from "@/lib/aiService";
+import { generateQuickCard, generateSolutionCard } from "@/lib/aiService";
 
 // Helper to get authenticated User ID from JWT
 function getUserIdFromRequest(req: NextRequest): string | null {
@@ -200,7 +200,11 @@ export async function POST(req: NextRequest) {
       correctness, // boolean
       timeTaken, // minutes
       hintsUsed, // number
-      submissionCount
+      submissionCount,
+      generationStrategy, // "quick" | "solution"
+      personalNotes,
+      programmingLanguage,
+      solutionCode
     } = body;
 
     if (!title || !platform || !url || !difficulty || confidence === undefined || correctness === undefined) {
@@ -278,6 +282,7 @@ export async function POST(req: NextRequest) {
       timeTaken,
       hintsUsed,
       submissionCount: submissionCount || 1,
+      personalNotes: personalNotes || "",
       easinessFactor,
       repetitionCount,
       interval,
@@ -289,11 +294,19 @@ export async function POST(req: NextRequest) {
 
     // Generate AI Knowledge Card inline (so it is saved immediately)
     try {
-      const card = await generateRevisionCard(title, difficulty, tags || []);
-      newItem.knowledgeCard = card;
-      newItem.isCardGenerated = true;
-      if (card.pattern && !newItem.pattern) {
-        newItem.pattern = card.pattern;
+      let card;
+      if (generationStrategy === "solution") {
+        card = await generateSolutionCard(title, difficulty, tags || [], programmingLanguage, solutionCode);
+      } else {
+        card = await generateQuickCard(title, difficulty, tags || [], pattern || "", personalNotes || "");
+      }
+      
+      if (card) {
+        newItem.knowledgeCard = card;
+        newItem.isCardGenerated = true;
+        if (card.pattern && !newItem.pattern) {
+          newItem.pattern = card.pattern;
+        }
       }
     } catch (err) {
       console.error("AI card generation failed on add problem:", err);

@@ -29,6 +29,7 @@ export interface IRevisionItem extends Document {
   tags: string[];
   pattern?: string;
   source: "library" | "external";
+  personalNotes?: string;
   
   // Performance signals
   confidence: number; // 1-5
@@ -66,6 +67,7 @@ const RevisionItemSchema = new Schema<IRevisionItem>({
   tags: [{ type: String }],
   pattern: { type: String, default: "" },
   source: { type: String, enum: ["library", "external"], required: true },
+  personalNotes: { type: String, default: "" },
 
   // Performance signals
   confidence: { type: Number, required: true, min: 1, max: 5 },
@@ -118,5 +120,6 @@ const RevisionItemSchema = new Schema<IRevisionItem>({
 // Index for fast query by user and checking due status
 RevisionItemSchema.index({ userId: 1, nextReviewDate: 1 });
 RevisionItemSchema.index({ userId: 1, problemId: 1 });
+RevisionItemSchema.index({ userId: 1, title: 1 });
 
 export default mongoose.models.RevisionItem || mongoose.model<IRevisionItem>("RevisionItem", RevisionItemSchema);
