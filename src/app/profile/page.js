@@ -11,13 +11,18 @@ function ProfileContent() {
 
   // Sync data states
   const [stats, setStats] = useState([]);
-  const [submissions, setSubmissions] = useState([]);
   const [topics, setTopics] = useState([]);
+  const [animated, setAnimated] = useState(false);
 
   // Hover state for chart tooltip
   const [hoveredPoint, setHoveredPoint] = useState(null); // { platform, rating, x, y }
 
-  // 2. Fetch User Stats, Submissions, and Topics once we have user ID
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimated(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 2. Fetch User Stats and Topics once we have user ID
   useEffect(() => {
     if (!user?._id) return;
 
@@ -28,13 +33,6 @@ function ProfileContent() {
         const statsData = await statsRes.json();
         if (Array.isArray(statsData)) {
           setStats(statsData);
-        }
-
-        // Fetch submissions
-        const subsRes = await fetch(`/api/user/submissions?userId=${user._id}&limit=10`);
-        const subsData = await subsRes.json();
-        if (Array.isArray(subsData)) {
-          setSubmissions(subsData);
         }
 
         // Fetch topics
@@ -51,38 +49,8 @@ function ProfileContent() {
     fetchUserData();
   }, [user]);
 
-  // Helper: Relative time formatting for submissions
-  const getRelativeTime = (dateInput) => {
-    const date = new Date(dateInput);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHr = Math.floor(diffMin / 60);
-    const diffDays = Math.floor(diffHr / 24);
-
-    if (diffSec < 60) return "Just now";
-    if (diffMin < 60) return `${diffMin} min${diffMin > 1 ? "s" : ""} ago`;
-    if (diffHr < 24) return `${diffHr} hr${diffHr > 1 ? "s" : ""} ago`;
-    if (diffDays === 1) return "Yesterday";
-    return `${diffDays} days ago`;
-  };
-
-  // Helper: Get Problem URL
-  const getProblemUrl = (title, platform, titleSlug) => {
-    return platform === "leetcode"
-      ? `https://leetcode.com/problems/${titleSlug || title.toLowerCase().replace(/ /g, "-")}/`
-      : `https://codeforces.com/problemset/problem/${titleSlug || "1800/A"}`;
-  };
-
   // Filter data based on active handles
   const activeStats = stats.filter(s => {
-    if (s.platform === "leetcode" && !user?.lcHandle) return false;
-    if (s.platform === "codeforces" && !user?.cfHandle) return false;
-    return true;
-  });
-
-  const activeSubmissions = submissions.filter(s => {
     if (s.platform === "leetcode" && !user?.lcHandle) return false;
     if (s.platform === "codeforces" && !user?.cfHandle) return false;
     return true;
@@ -304,13 +272,13 @@ function ProfileContent() {
               {user?.name || "Developer"}
             </h2>
             <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", margin: "0" }}>
-              Competitive programmer | Member since May 2026
+              Competitive programmer
             </p>
           </div>
         </div>
 
         {/* Handles badges */}
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           {user?.lcHandle ? (
             <a href={`https://leetcode.com/${user.lcHandle}`} target="_blank" rel="noreferrer" className="badge badge-leetcode" style={{ textTransform: "none", fontSize: "0.75rem", padding: "0.4rem 0.8rem", display: "inline-flex", alignItems: "center", gap: "6px", textDecoration: "none" }}>
               <span>leetcode.com/{user.lcHandle}</span>
@@ -533,10 +501,10 @@ function ProfileContent() {
                   <div style={{ height: "8px", backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "4px", border: "1px solid var(--border-ice)" }}>
                     <div style={{
                       height: "100%",
-                      width: `${Math.min(100, (t.solved / t.max) * 100)}%`,
+                      width: animated ? `${Math.min(100, (t.solved / t.max) * 100)}%` : "0%",
                       background: t.color,
                       borderRadius: "4px",
-                      transition: "width 0.4s ease-out"
+                      transition: "width 0.8s ease-out"
                     }} />
                   </div>
                 </div>
@@ -555,7 +523,15 @@ function ProfileContent() {
           
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {/* Strengths */}
-            <div style={{ padding: "0.85rem", borderRadius: "10px", background: "rgba(16, 185, 129, 0.03)", border: "1px solid rgba(16, 185, 129, 0.1)" }}>
+            <div style={{ 
+              padding: "0.85rem", 
+              borderRadius: "10px", 
+              background: "rgba(16, 185, 129, 0.03)", 
+              border: "1px solid rgba(16, 185, 129, 0.1)",
+              opacity: animated ? 1 : 0,
+              transform: animated ? "translateY(0)" : "translateY(10px)",
+              transition: "all 0.5s ease-out"
+            }}>
               <span style={{ fontSize: "0.75rem", color: "var(--text-success)", fontWeight: "700", textTransform: "uppercase", display: "block", marginBottom: "0.5rem" }}>
                 Strengths (High Solve Rates)
               </span>
@@ -571,7 +547,15 @@ function ProfileContent() {
             </div>
 
             {/* Weaknesses */}
-            <div style={{ padding: "0.85rem", borderRadius: "10px", background: "rgba(239, 68, 68, 0.03)", border: "1px solid rgba(239, 68, 68, 0.1)" }}>
+            <div style={{ 
+              padding: "0.85rem", 
+              borderRadius: "10px", 
+              background: "rgba(239, 68, 68, 0.03)", 
+              border: "1px solid rgba(239, 68, 68, 0.1)",
+              opacity: animated ? 1 : 0,
+              transform: animated ? "translateY(0)" : "translateY(10px)",
+              transition: "all 0.5s ease-out 0.1s"
+            }}>
               <span style={{ fontSize: "0.75rem", color: "var(--text-danger)", fontWeight: "700", textTransform: "uppercase", display: "block", marginBottom: "0.5rem" }}>
                 Weaknesses (Practice Targets)
               </span>
@@ -590,73 +574,6 @@ function ProfileContent() {
 
       </div>
 
-      {/* 5. Submissions Table */}
-      <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ fontSize: "1.1rem", margin: "0" }}>Submissions Feed (Last 10)</h3>
-          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Realtime sync LeetCode & Codeforces</span>
-        </div>
-
-        <div className="table-container">
-          {activeSubmissions.length > 0 ? (
-            <table>
-              <thead>
-                <tr>
-                  <th>Problem Name</th>
-                  <th>Platform</th>
-                  <th>Language</th>
-                  <th>Verdict</th>
-                  <th>Submitted Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeSubmissions.map((sub, idx) => (
-                  <tr key={idx}>
-                    <td>
-                      <a 
-                        href={getProblemUrl(sub.title, sub.platform, sub.titleSlug)} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        style={{ fontSize: "0.85rem", fontWeight: "600", textDecoration: "none", color: "white" }}
-                        className="link-hover"
-                        onMouseOver={(e) => e.currentTarget.style.color = "var(--primary-light)"}
-                        onMouseOut={(e) => e.currentTarget.style.color = "white"}
-                      >
-                        {sub.title}
-                      </a>
-                    </td>
-                    <td>
-                      <span className={`badge ${sub.platform === "leetcode" ? "badge-leetcode" : "badge-codeforces"}`} style={{ fontSize: "0.65rem" }}>
-                        {sub.platform === "leetcode" ? "LeetCode" : "Codeforces"}
-                      </span>
-                    </td>
-                    <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>{sub.language}</td>
-                    <td>
-                      <span style={{
-                        fontSize: "0.75rem",
-                        fontWeight: "700",
-                        color: (sub.verdict === "Accepted" || sub.verdict === "OK") ? "var(--text-success)" : sub.verdict === "Wrong Answer" ? "var(--text-danger)" : "var(--text-warning)",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px"
-                      }}>
-                        {(sub.verdict === "Accepted" || sub.verdict === "OK") ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-                        {sub.verdict === "OK" ? "Accepted" : sub.verdict}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{getRelativeTime(sub.timestamp)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-              No submissions found. Sync your coding accounts to populate history.
-            </div>
-          )}
-        </div>
-      </div>
-
       <style jsx global>{`
         @media (max-width: 900px) {
           .profile-charts-layout {
@@ -665,6 +582,9 @@ function ProfileContent() {
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        .spin-animation {
+          animation: spin 1s infinite linear;
         }
         
         .custom-scrollbar::-webkit-scrollbar {
