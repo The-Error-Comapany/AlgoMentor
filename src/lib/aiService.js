@@ -1,3 +1,7 @@
+// Base URL for the Python FastAPI AI service.
+// Override with AI_SERVICE_URL env var in production.
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://127.0.0.1:8000";
+
 // Generates a mock card dynamically in case of API failure or missing keys
 const generateHeuristicCard = (title, difficulty, tags, patternUsed = "") => {
   const primaryTag = tags && tags.length > 0 ? tags[0] : "General";
@@ -20,7 +24,7 @@ const generateHeuristicCard = (title, difficulty, tags, patternUsed = "") => {
  */
 export async function generateQuickCard(title, difficulty, tags, patternUsed, personalNotes) {
   try {
-    const response = await fetch("http://127.0.0.1:8000/generate-quick-card", {
+    const response = await fetch(`${AI_SERVICE_URL}/generate-quick-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, difficulty, tags: tags || [], patternUsed, personalNotes })
@@ -39,7 +43,7 @@ export async function generateQuickCard(title, difficulty, tags, patternUsed, pe
  */
 export async function generateSolutionCard(title, difficulty, tags, programmingLanguage, solutionCode) {
   try {
-    const response = await fetch("http://127.0.0.1:8000/generate-solution-card", {
+    const response = await fetch(`${AI_SERVICE_URL}/generate-solution-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, difficulty, tags: tags || [], programmingLanguage, solutionCode })
@@ -51,4 +55,12 @@ export async function generateSolutionCard(title, difficulty, tags, programmingL
     console.error("Failed to generate solution AI card. Falling back.", error);
     return generateHeuristicCard(title, difficulty, tags);
   }
+}
+
+/**
+ * Alias used by the generate-card API route for standalone card regeneration.
+ * Delegates to generateQuickCard with empty pattern/notes so the LLM infers them.
+ */
+export async function generateRevisionCard(title, difficulty, tags) {
+  return generateQuickCard(title, difficulty, tags, "", "");
 }

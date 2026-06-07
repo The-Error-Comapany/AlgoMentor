@@ -1,28 +1,34 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/context/AuthContext";
 import {
   Brain,
   Send,
-  Trash2,
   User,
   Clock,
   Sparkles,
   Code2,
   Cpu,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  X
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 function MentorContent() {
   const searchParams = useSearchParams();
   const initProblem = searchParams.get("problem");
   const initPlatform = searchParams.get("platform");
+  const { user, accessToken } = useAuth();
 
   // Dynamic user name state
-  const [userName, setUserName] = useState("Aishvary");
+  const [userName, setUserName] = useState("");
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedName = localStorage.getItem("userName");
@@ -32,20 +38,109 @@ function MentorContent() {
     }
   }, []);
 
-  // Conversation state
+  const [userStats, setUserStats] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+
   const [messages, setMessages] = useState([
     {
       sender: "ai",
-      text: "Hey there! I've loaded your DSA metrics. I see you've mastered **Arrays & Hashing (92%)** but could use some work on **Dynamic Programming (30%)** and **Recursion State Transitions**.\n\nHow can I help you sharpen your skills today? I can suggest problems, explain algorithms, or review your code!",
-      time: "11:15 AM"
+      text: "Hey there! I'm loading your DSA metrics...",
+      time: "Just now"
     }
   ]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const userId = user?._id;
+      if (!userId) {
+        setMessages([{
+          sender: "ai",
+          text: "Hey there! How can I help you sharpen your DSA skills today?",
+          time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+        }]);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/user/stats?userId=${userId}`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          setUserStats(data[0]);
+          setMessages([
+            {
+              sender: "ai",
+              text: `Hey there! I've loaded your DSA metrics. I see you've solved ${data[0].solved || 0} problems!\n\nHow can I help you sharpen your skills today? I can suggest problems, explain algorithms, or review your code!`,
+              time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+            }
+          ]);
+        } else {
+          setMessages([{
+            sender: "ai",
+            text: "Hey there! How can I help you sharpen your DSA skills today?",
+            time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+          }]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch stats", err);
+      }
+    };
+
+    const fetchSessions = async () => {
+      const userId = user?._id;
+      if (!userId) return;
+      try {
+        const res = await fetch(`/api/mentor/sessions?userId=${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          setSessions(data.sessions);
+          // Restore the last active session on refresh
+          const savedSessionId = localStorage.getItem("mentorSessionId");
+          if (savedSessionId) {
+            const sessionRes = await fetch(`/api/mentor/sessions?userId=${userId}&sessionId=${savedSessionId}`);
+            const sessionData = await sessionRes.json();
+            if (sessionData.success && sessionData.session) {
+              setMessages(sessionData.session.messages);
+              setCurrentSessionId(savedSessionId);
+              return; // Skip the stats greeting — session is restored
+            }
+          }
+        }
+      } catch (e) {}
+    };
+
+    if (user) {
+      fetchSessions().then(() => {
+        // fetchStats sets the greeting only if no session was restored
+        if (!localStorage.getItem("mentorSessionId")) {
+          fetchStats();
+        }
+      });
+    }
+  }, [user]);
+
+  // Persist current session ID so it survives a refresh
+  useEffect(() => {
+    if (currentSessionId) {
+      localStorage.setItem("mentorSessionId", currentSessionId);
+    }
+  }, [currentSessionId]);
+
+  const loadSession = async (sessionId) => {
+    const userId = user?._id;
+    try {
+      const res = await fetch(`/api/mentor/sessions?userId=${userId}&sessionId=${sessionId}`);
+      const data = await res.json();
+      if (data.success) {
+        setMessages(data.session.messages);
+        setCurrentSessionId(sessionId);
+      }
+    } catch (err) {}
+  };
   
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Left Panel collapsible Code Reviewer state
-  const [showCodeBox, setShowCodeBox] = useState(false);
+  // Left Panel Code Reviewer state
   const [codeToReview, setCodeToReview] = useState(
 `int fib(int n) {
     if (n <= 1) return n;
@@ -76,89 +171,233 @@ function MentorContent() {
           time: "11:16 AM"
         }
       ]);
-      setShowCodeBox(true);
     }
   }, [initProblem, initPlatform]);
 
-  const handleSend = (textToSend = input) => {
+  const handleSend = async (textToSend = input) => {
     if (!textToSend.trim()) return;
 
     const timeStr = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
     const userMsg = { sender: "user", text: textToSend, time: timeStr };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const currentMessages = [...messages, userMsg];
+    setMessages(currentMessages);
     setInput("");
     setLoading(true);
 
-    // AI typing simulated response
-    setTimeout(() => {
-      let aiResponseText = "";
-      const textLower = textToSend.toLowerCase();
+    try {
+      const history = currentMessages.map(m => ({
+        role: m.sender === "ai" ? "assistant" : "user",
+        content: m.text
+      }));
+      const userId = user?._id;
 
-      if (textLower.includes("study next") || textLower.includes("roadmap") || textLower.includes("what should i")) {
-        aiResponseText = "Based on your current dashboard diagnostics, you should focus on **Sliding Window Problems** first to bridge the gap between Arrays and DP. Try practicing *'Sliding Window Maximum'* or *'Longest Substring Without Repeating Characters'*. I've highlighted these in your library!";
-      } else if (textLower.includes("dynamic programming") || textLower.includes("dp")) {
-        aiResponseText = "Dynamic Programming (DP) is just recursion with state memoization! Since your strength is Arrays, you can think of DP as filling up a 1D or 2D array representing subproblems. Let's start with *'Climbing Stairs'* (1D array) then move to *'Unique Paths'* (2D array).";
-      } else if (textLower.includes("recursion") || textLower.includes("base case")) {
-        aiResponseText = "Recursion requires two key elements:\n1. The **base case** (terminating condition to prevent stack overflow).\n2. The **relation step** (how to divide the subproblem).\n\nIf you have recursive code ready, paste it in the **Review my code** editor box on the left, and I'll trace its stack frame and runtime complexity.";
-      } else {
-        aiResponseText = "That's an interesting approach! Make sure you evaluate your recursion base cases. If you want me to analyze the exact time and space complexity of your algorithm, paste your code in the **Review my code** editor panel on the left and let's run an optimization trace.";
+      let newSessionId = currentSessionId;
+      try {
+        const saveRes = await fetch("/api/mentor/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+          userId, 
+          sessionId: currentSessionId, 
+          // Filter out any messages with empty time (initial loading placeholder)
+          messages: currentMessages.filter(m => m.time && m.time.trim()), 
+          title: textToSend.substring(0, 30) + "..." 
+        })
+        });
+        const saveData = await saveRes.json();
+        if (saveData.success) {
+          newSessionId = saveData.sessionId;
+          setCurrentSessionId(newSessionId);
+          // Instantly update the Left Panel
+          setSessions(prev => {
+            const exists = prev.find(s => s._id === newSessionId);
+            if (exists) {
+              return prev.map(s => s._id === newSessionId ? { ...s, lastUpdated: new Date().toISOString() } : s).sort((a,b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+            } else {
+              return [{ _id: newSessionId, title: textToSend.substring(0, 30) + "...", lastUpdated: new Date().toISOString() }, ...prev];
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Failed to save session:", e);
       }
 
-      const aiMsg = { sender: "ai", text: aiResponseText, time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) };
-      setMessages((prev) => [...prev, aiMsg]);
+      const res = await fetch("/api/mentor/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: textToSend, history, mode: "chat", userId: user?._id })
+      });
+      const data = await res.json();
+      const aiMsg = {
+        sender: "ai",
+        text: data.success ? data.reply : "Sorry, I ran into an issue. Please try again!",
+        time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      };
+      const finalMsgs = [...currentMessages, aiMsg];
+      setMessages(finalMsgs);
+
+      try {
+        await fetch("/api/mentor/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+          userId, 
+          sessionId: newSessionId, 
+          messages: finalMsgs.filter(m => m.time && m.time.trim()) 
+        })
+        });
+      } catch (e) {}
+
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { sender: "ai", text: "Network error — couldn't reach the AI service. Please check your connection!", time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) }
+      ]);
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
-  const submitCodeReview = () => {
+  const submitCodeReview = async () => {
     if (!codeToReview.trim()) return;
 
     const timeStr = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
     const userMsg = { 
       sender: "user", 
-      text: `Please review the complexity of this code:\n\n\`\`\`cpp\n${codeToReview}\n\`\`\``, 
+      text: `Please review the complexity of this code:\n\n\`\`\`\n${codeToReview}\n\`\`\``, 
       time: timeStr 
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
-    // Simulated Code Complexity Evaluation
-    setTimeout(() => {
-      const aiResponseText = `I've analyzed your submitted code! Here is the complexity and optimization breakdown:\n\n` +
-        `• **Time Complexity:** O(2^N) — Exponential recursion due to independent fib(n-1) and fib(n-2) branches.\n` +
-        `• **Space Complexity:** O(N) — Recursion stack depth.\n` +
-        `• **Verdict:** Sub-Optimal (highly redundant calculations).\n\n` +
-        `**Optimized Solution Hint:**\n` +
-        `\`\`\`cpp\n` +
-        `int memo[1000] = {0};\n` +
-        `int fib(int n) {\n` +
-        `    if (n <= 1) return n;\n` +
-        `    if (memo[n] != 0) return memo[n];\n` +
-        `    return memo[n] = fib(n - 1) + fib(n - 2);\n` +
-        `}\n` +
-        `\`\`\`\n` +
-        `By introducing a memoization array, you capture repeating states and reduce the time complexity from **exponential O(2^N)** to **linear O(N)**!`;
-
-      const aiMsg = { sender: "ai", text: aiResponseText, time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) };
+    try {
+      const res = await fetch("/api/mentor/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Please review this code", code: codeToReview, mode: "review", userId: user?._id })
+      });
+      const data = await res.json();
+      const aiMsg = {
+        sender: "ai",
+        text: data.success ? data.reply : "Sorry, the AI code review failed. Please check that the AI service is running!",
+        time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      };
       setMessages((prev) => [...prev, aiMsg]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { sender: "ai", text: "Network error — couldn't reach the AI service. Please check your connection!", time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) }
+      ]);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
+  };
+
+  const deleteSession = async (e, sessionId) => {
+    e.stopPropagation(); // don't trigger loadSession
+    if (!confirm("Delete this chat session?")) return;
+    try {
+      await fetch(`/api/mentor/sessions?sessionId=${sessionId}&userId=${user?._id}`, { method: "DELETE" });
+      setSessions(prev => prev.filter(s => s._id !== sessionId));
+      if (currentSessionId === sessionId) {
+        clearChat();
+      }
+    } catch (err) {}
   };
 
   const clearChat = () => {
+    setCurrentSessionId(null);
+    localStorage.removeItem("mentorSessionId");
     setMessages([
       {
         sender: "ai",
-        text: "Conversation history cleared. I'm ready for new algorithms! What should we solve next?",
+        text: "Started a new coaching session! What should we solve next?",
         time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
       }
     ]);
   };
 
+
+  const addToRevisionHub = async (title) => {
+    const token = accessToken;
+    if (!token) {
+      alert("You must be logged in to add problems to the Revision Hub.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/revision", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title,
+          platform: "LeetCode",
+          url: "https://leetcode.com/problems/" + title.toLowerCase().replace(/\s+/g, '-') + "/",
+          difficulty: "Medium",
+          source: "library",
+          confidence: 3,
+          correctness: false,
+          timeTaken: 0,
+          hintsUsed: 0,
+          submissionCount: 0
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(`✅ Added '${title}' to your Revision Hub!`);
+      } else {
+        alert(`❌ Could not add: ${data.message || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`❌ Network error: ${err.message}`);
+    }
+  };
+
+  const MarkdownComponents = {
+    code({node, inline, className, children, ...props}) {
+      const match = /language-(\w+)/.exec(className || '')
+      return !inline && match ? (
+        <SyntaxHighlighter
+          style={vscDarkPlus}
+          language={match[1]}
+          PreTag="div"
+          {...props}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      ) : (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      )
+    },
+    p({ children }) {
+      // Find strings that have [PROBLEM: X]
+      let newChildren = [];
+      React.Children.forEach(children, (child, index) => {
+        if (typeof child === 'string' && child.includes('[PROBLEM:')) {
+          const parts = child.split(/\[PROBLEM:(.*?)\]/g);
+          parts.forEach((part, i) => {
+            if (i % 2 === 1) {
+              newChildren.push(<button key={`btn-${index}-${i}`} onClick={() => addToRevisionHub(part.trim())} className="btn btn-primary btn-sm" style={{display:'inline-block', margin:'2px 4px', background:'linear-gradient(135deg, #8b5cf6, #ec4899)', border:'none', color:'white', fontSize:'0.7rem', padding:'2px 8px'}}>➕ Add '{part.trim()}'</button>);
+            } else if (part) {
+              newChildren.push(part);
+            }
+          });
+        } else {
+          newChildren.push(child);
+        }
+      });
+      return <p>{newChildren}</p>;
+    }
+  };
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "1.5rem", height: "calc(100vh - 130px)" }} className="mentor-grid-layout">
+    <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: "1.5rem", height: "calc(100vh - 130px)" }} className="mentor-grid-layout">
       
       {/* 1. Left Panel: Presets & History */}
       <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", height: "100%", overflowY: "auto" }}>
@@ -172,70 +411,71 @@ function MentorContent() {
 
           <button 
             className="btn btn-secondary btn-sm" 
-            onClick={() => handleSend("What should I study next?")}
+            onClick={() => handleSend("Based on my profile context and revision queue, what specific problem should I tackle next and why?")}
             style={{ width: "100%", justifyContent: "flex-start", fontSize: "0.8rem", textAlign: "left", padding: "0.5rem 0.75rem" }}
           >
-            <span>What should I study next? 🚀</span>
+            <span>Suggest next problem 🎯</span>
           </button>
 
           <button 
             className="btn btn-secondary btn-sm" 
-            onClick={() => setShowCodeBox(!showCodeBox)}
-            style={{ 
-              width: "100%", 
-              justifyContent: "flex-start", 
-              fontSize: "0.8rem", 
-              textAlign: "left", 
-              padding: "0.5rem 0.75rem",
-              background: showCodeBox ? "rgba(99,102,241,0.1)" : "none",
-              borderColor: showCodeBox ? "rgba(99,102,241,0.3)" : "var(--border-ice)"
-            }}
+            onClick={() => handleSend("Look at my weakest topics and create a structured 3-day roadmap for me to improve.")}
+            style={{ width: "100%", justifyContent: "flex-start", fontSize: "0.8rem", textAlign: "left", padding: "0.5rem 0.75rem" }}
           >
-            <span>Review my code 💻</span>
+            <span>Create a 3-day roadmap 📈</span>
           </button>
-
-          {/* Plain Collapsible Code Review Box */}
-          {showCodeBox && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px", animation: "slideIn 0.2s ease-out" }}>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>Paste code below to check complexity:</span>
-              <textarea
-                value={codeToReview}
-                onChange={(e) => setCodeToReview(e.target.value)}
-                placeholder="// Write code here"
-                style={{
-                  height: "120px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "0.75rem",
-                  background: "rgba(8,11,17,0.6)",
-                  border: "1px solid var(--border-ice)",
-                  borderRadius: "8px",
-                  padding: "8px",
-                  color: "#34d399",
-                  resize: "none",
-                  outline: "none"
-                }}
-              />
-              <button 
-                className="btn btn-primary btn-sm" 
-                onClick={submitCodeReview} 
-                style={{ width: "100%", fontSize: "0.75rem", padding: "0.45rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
-              >
-                <Cpu size={12} />
-                <span>Submit Code for Review</span>
-              </button>
-            </div>
-          )}
 
           <button 
             className="btn btn-secondary btn-sm" 
-            onClick={() => handleSend("Explain Dynamic Programming state transitions")}
+            onClick={() => handleSend("Explain the core difference and trade-offs between Dynamic Programming and Greedy algorithms.")}
             style={{ width: "100%", justifyContent: "flex-start", fontSize: "0.8rem", textAlign: "left", padding: "0.5rem 0.75rem" }}
           >
-            <span>DP Transitions Help 🧠</span>
+            <span>DP vs Greedy Concepts 🧠</span>
           </button>
         </div>
 
-        {/* Mock Past Sessions Timeline Card */}
+        {/* Dedicated Code Review Card */}
+        <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "0.85rem", padding: "1.25rem", flexGrow: "1" }}>
+          <h4 style={{ fontSize: "0.85rem", color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: "700", margin: "0 0 4px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <Code2 size={14} style={{ color: "#34d399" }} />
+            Code Review
+          </h4>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexGrow: "1" }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>Paste code below to check complexity, edge cases, and optimizations:</span>
+            <textarea
+              value={codeToReview}
+              onChange={(e) => setCodeToReview(e.target.value)}
+              placeholder="// Write or paste your code here..."
+              style={{
+                height: "100%",
+                minHeight: "350px",
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.8rem",
+                background: "rgba(0, 0, 0, 0.4)",
+                border: "1px solid rgba(52, 211, 153, 0.2)",
+                borderRadius: "8px",
+                padding: "12px",
+                color: "#a7f3d0",
+                resize: "vertical",
+                outline: "none",
+                boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                lineHeight: "1.5"
+              }}
+            />
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={submitCodeReview} 
+              disabled={loading}
+              style={{ width: "100%", fontSize: "0.8rem", padding: "0.6rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", border: "none", color: "white" }}
+            >
+              <Cpu size={14} />
+              <span style={{ fontWeight: "600" }}>Analyze Code Complexity</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Persistent Past Sessions Timeline Card */}
         <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "0.85rem", padding: "1.25rem", flexGrow: "1" }}>
           <h4 style={{ fontSize: "0.85rem", color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: "700", margin: "0 0 4px", display: "flex", alignItems: "center", gap: "6px" }}>
             <Clock size={14} style={{ color: "var(--primary-light)" }} />
@@ -243,28 +483,43 @@ function MentorContent() {
           </h4>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {[
-              { title: "Sliding Window Max", date: "May 21" },
-              { title: "DP Memoization Guide", date: "May 18" },
-              { title: "C++ Vector Optimization", date: "May 12" }
-            ].map((session, i) => (
-              <div 
-                key={i} 
-                style={{ 
-                  display: "flex", 
-                  justifyContent: "space-between", 
-                  alignItems: "center", 
-                  padding: "0.6rem 0.75rem", 
-                  borderRadius: "8px", 
-                  background: "rgba(255,255,255,0.02)", 
-                  border: "1px solid var(--border-ice)",
-                  cursor: "pointer"
-                }}
-              >
-                <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: "500" }}>{session.title}</span>
-                <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>{session.date}</span>
+            {sessions.length === 0 ? (
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", padding: "0.6rem 0.75rem", textAlign: "center" }}>
+                No past sessions found.
               </div>
-            ))}
+            ) : (
+              sessions.map((session) => (
+                <div 
+                  key={session._id} 
+                  onClick={() => loadSession(session._id)}
+                  style={{ 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    alignItems: "center", 
+                    padding: "0.5rem 0.6rem 0.5rem 0.75rem", 
+                    borderRadius: "8px", 
+                    background: currentSessionId === session._id ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.02)", 
+                    border: currentSessionId === session._id ? "1px solid rgba(99,102,241,0.4)" : "1px solid var(--border-ice)",
+                    cursor: "pointer",
+                    gap: "6px"
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden", flex: 1 }}>
+                    <span style={{ fontSize: "0.73rem", color: "var(--text-secondary)", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{session.title}</span>
+                    <span style={{ fontSize: "0.62rem", color: "var(--text-muted)" }}>{new Date(session.lastUpdated).toLocaleDateString()}</span>
+                  </div>
+                  <button
+                    onClick={(e) => deleteSession(e, session._id)}
+                    title="Delete session"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: "2px 4px", borderRadius: "4px", flexShrink: 0, lineHeight: 1, opacity: 0.6 }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                    onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
+                  >
+                    <X size={12} style={{ color: "#f87171" }} />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -291,13 +546,18 @@ function MentorContent() {
               <h4 style={{ fontSize: "0.95rem", margin: "0", color: "white", fontWeight: "600" }}>Algo Mentor AI</h4>
               <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "0.7rem", color: "var(--text-success)" }}>
                 <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#10b981" }} />
-                <span>Context Ready: Arrays 92% | DP 30%</span>
+                <span>Context Ready: {userStats ? `Solved: ${userStats.solved || 0}` : "Loading stats..."}</span>
               </div>
             </div>
           </div>
 
-          <button className="btn btn-secondary btn-sm" onClick={clearChat} title="Clear conversation logs">
-            <Trash2 size={14} />
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={clearChat}
+            style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.78rem", padding: "0.4rem 0.85rem", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none" }}
+          >
+            <Plus size={13} />
+            New Chat
           </button>
         </div>
 
@@ -343,10 +603,9 @@ function MentorContent() {
                   color: "white",
                   border: m.sender === "user" ? "1px solid rgba(99, 102, 241, 0.3)" : "1px solid var(--border-ice)",
                   borderTopLeftRadius: m.sender === "user" ? "14px" : "0",
-                  borderTopRightRadius: m.sender === "user" ? "0" : "14px",
-                  whiteSpace: "pre-line"
-                }}>
-                  {m.text}
+                  borderTopRightRadius: m.sender === "user" ? "0" : "14px"
+                }} className="markdown-body-override">
+                  <ReactMarkdown components={MarkdownComponents}>{m.text}</ReactMarkdown>
                 </div>
                 <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", alignSelf: m.sender === "user" ? "flex-end" : "flex-start" }}>
                   {m.time}
@@ -397,6 +656,22 @@ function MentorContent() {
         @keyframes slideIn {
           from { transform: translateY(10px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
+        }
+        .markdown-body-override p {
+          margin-bottom: 0.5rem;
+          margin-top: 0;
+        }
+        .markdown-body-override p:last-child {
+          margin-bottom: 0;
+        }
+        .markdown-body-override strong {
+          font-weight: 700;
+          color: #818cf8;
+        }
+        .markdown-body-override ul, .markdown-body-override ol {
+          margin-top: 0;
+          margin-bottom: 0.5rem;
+          padding-left: 1.5rem;
         }
       `}</style>
 

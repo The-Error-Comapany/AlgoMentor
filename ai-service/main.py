@@ -13,10 +13,14 @@ load_dotenv()
 
 app = FastAPI(title="AlgoMentor AI Service")
 
-# Allow CORS so Next.js can communicate with it
+# Allow CORS so Next.js can communicate with it.
+# Set ALLOWED_ORIGINS in .env as a comma-separated list of origins.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,20 +40,29 @@ class SolutionCardRequest(BaseModel):
     programmingLanguage: str
     solutionCode: str
 
-# No more fallback heuristics. We want to guarantee real AI output or fail loudly.
+import requests
 
-def get_llm():
-    token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+def call_groq_completion(prompt_text: str) -> str:
+    token = os.getenv("GROQ_API_KEY")
     if not token or "placeholder" in token or "random" in token:
-        return None
-    repo_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    return HuggingFaceEndpoint(
-        repo_id=repo_id,
-        huggingfacehub_api_token=token,
-        temperature=0.1, # Extremely low temp for high focus and accuracy
-        max_new_tokens=800,
-        return_full_text=False
-    )
+        raise ValueError("GROQ_API_KEY is missing or invalid. Please add it to your .env file from console.groq.com.")
+    
+    API_URL = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [{"role": "user", "content": prompt_text}],
+        "temperature": 0.1,
+        "max_tokens": 1024
+    }
+    response = requests.post(API_URL, headers=headers, json=payload)
+    if response.status_code != 200:
+        raise Exception(f"Groq API Error {response.status_code}: {response.text}")
+    
+    result = response.json()
+    if "choices" in result and len(result["choices"]) > 0:
+        return result["choices"][0]["message"]["content"]
+    return str(result)
 
 QUICK_TEMPLATE = """You are a Senior Technical Interview Coach. Create a structured interview revision card strictly for the requested DSA problem.
 CRITICAL: Generate the summary EXACTLY for the provided problem. Do NOT hallucinate concepts from other topics or problems.
@@ -115,26 +128,21 @@ def parse_json_response(response_text: str) -> dict:
         raise ValueError(f"No JSON object found in response: {text}")
     
     json_str = json_match.group(0)
+    import json
     return json.loads(json_str)
 
 @app.post("/generate-quick-card")
 async def generate_quick_card(request: QuickCardRequest):
-    llm = get_llm()
-    if not llm:
-        raise HTTPException(status_code=500, detail="HuggingFace token is missing or invalid.")
-
     try:
-        prompt = PromptTemplate.from_template(QUICK_TEMPLATE)
-        chain = prompt | llm
-        
         tags_str = ", ".join(request.tags)
-        response_text = chain.invoke({
-            "title": request.title,
-            "difficulty": request.difficulty,
-            "tags": tags_str,
-            "patternUsed": request.patternUsed,
-            "personalNotes": request.personalNotes
-        })
+        prompt_text = QUICK_TEMPLATE.format(
+            title=request.title,
+            difficulty=request.difficulty,
+            tags=tags_str,
+            patternUsed=request.patternUsed,
+            personalNotes=request.personalNotes
+        )
+        response_text = call_groq_completion(prompt_text)
         return parse_json_response(response_text)
     except Exception as e:
         print(f"Failed to generate quick AI card. Error: {e}")
@@ -142,26 +150,91 @@ async def generate_quick_card(request: QuickCardRequest):
 
 @app.post("/generate-solution-card")
 async def generate_solution_card(request: SolutionCardRequest):
-    llm = get_llm()
-    if not llm:
-        raise HTTPException(status_code=500, detail="HuggingFace token is missing or invalid.")
-
     try:
-        prompt = PromptTemplate.from_template(SOLUTION_TEMPLATE)
-        chain = prompt | llm
-        
         tags_str = ", ".join(request.tags)
-        response_text = chain.invoke({
-            "title": request.title,
-            "difficulty": request.difficulty,
-            "tags": tags_str,
-            "programmingLanguage": request.programmingLanguage,
-            "solutionCode": request.solutionCode
-        })
+        prompt_text = SOLUTION_TEMPLATE.format(
+            title=request.title,
+            difficulty=request.difficulty,
+            tags=tags_str,
+            programmingLanguage=request.programmingLanguage,
+            solutionCode=request.solutionCode
+        )
+        response_text = call_groq_completion(prompt_text)
         return parse_json_response(response_text)
     except Exception as e:
         print(f"Failed to generate solution AI card. Error: {e}")
         raise HTTPException(status_code=500, detail=f"AI Generation Failed: {str(e)}")
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[ChatMessage]] = None
+    userContext: Optional[str] = None
+
+def call_groq_chat(message: str, history: Optional[List[ChatMessage]] = None, user_context: Optional[str] = None) -> str:
+    token = os.getenv("GROQ_API_KEY")
+    if not token or "placeholder" in token or "random" in token:
+        raise ValueError("GROQ_API_KEY is missing or invalid. Please add it to your .env file from console.groq.com.")
+    
+    API_URL = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    system_prompt = (
+        "You are AlgoMentor AI, an expert Senior Technical Interview Coach and DSA mentor. "
+        "A student is asking for your help. Give a concise, helpful, and encouraging response focusing on Data Structures and Algorithms. "
+        "Do not just give the code answer directly; try to guide them using the Socratic method.\n"
+        "Explain time complexities and space complexities in detail. Formulate a future plan or suggestions if applicable.\n"
+        "CRITICAL INSTRUCTION: When you suggest a specific DSA problem for the user to solve, you MUST wrap the problem title exactly like this: [PROBLEM: Title]. "
+        "For example, 'You should try [PROBLEM: Climbing Stairs] next.' This allows the frontend to render an interactive button.\n"
+        "CRITICAL INSTRUCTION: DO NOT ask the user for their experience level, preferred platforms, or topics they want to improve on. "
+        "You already have access to this via the 'User Profile Context' below. If their profile context is completely empty (0 solved), immediately assume they are a beginner and proactively suggest a starting path (like Arrays/Hashing) instead of asking them.\n\n"
+    )
+    
+    if user_context and user_context.strip():
+        system_prompt += (
+            "Here is the student's current profile context fetched from the database. Use this context to personalize your advice. "
+            "Explicitly reference their past struggles, their solved problems, and suggest what they should focus on next based on their revision schedule and mastery scores:\n"
+            f"{user_context}\n"
+        )
+    
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    
+    if history and len(history) > 0:
+        # history includes the current message from the frontend
+        for h in history:
+            messages.append({"role": h.role, "content": h.content})
+    else:
+        messages.append({"role": "user", "content": message})
+        
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": messages,
+        "temperature": 0.3,
+        "max_tokens": 1024
+    }
+    
+    response = requests.post(API_URL, headers=headers, json=payload)
+    if response.status_code != 200:
+        raise Exception(f"Groq API Error {response.status_code}: {response.text}")
+    
+    result = response.json()
+    if "choices" in result and len(result["choices"]) > 0:
+        return result["choices"][0]["message"]["content"]
+    return str(result)
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    try:
+        response_text = call_groq_chat(request.message, request.history, request.userContext)
+        return {"reply": response_text.strip()}
+    except Exception as e:
+        print(f"Failed to generate chat response. Error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI Chat Failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
