@@ -58,15 +58,13 @@ function RevisionHubContent() {
   const [extUrl, setExtUrl] = useState("");
   const [extDifficulty, setExtDifficulty] = useState("Medium");
   const [extTags, setExtTags] = useState([]); // Array of strings
-  
-  // AI Generation States
-  const [addMethod, setAddMethod] = useState(null); // 'quick' | 'solution' | null
-  const [patternUsed, setPatternUsed] = useState("");
-  const [personalNotes, setPersonalNotes] = useState("");
-  const [programmingLanguage, setProgrammingLanguage] = useState("Python");
-  const [solutionCode, setSolutionCode] = useState("");
-  
-  const ALL_TOPICS = [
+  // Rate Review Modal State
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [rateItemId, setRateItemId] = useState(null);
+  const [rateConfidence, setRateConfidence] = useState(3);
+  const [rateTimeTaken, setRateTimeTaken] = useState(20);
+  const [rateHintsUsed, setRateHintsUsed] = useState(0);
+const ALL_TOPICS = [
     "Arrays", "Strings", "Trees", "Graphs", "DP", "Dynamic Programming", 
     "Sliding Window", "Binary Search", "Backtracking", "Heap", 
     "Linked List", "Stack", "Queue", "Greedy", "Two Pointers"
@@ -140,11 +138,6 @@ function RevisionHubContent() {
     setExtUrl("");
     setExtDifficulty("Medium");
     setExtTags([]);
-    setAddMethod(null);
-    setPatternUsed("");
-    setPersonalNotes("");
-    setProgrammingLanguage("Python");
-    setSolutionCode("");
     setErrorMessage("");
   };
 
@@ -170,17 +163,12 @@ function RevisionHubContent() {
         url: selectedProb.url,
         difficulty: selectedProb.difficulty,
         tags: selectedProb.tags,
-        pattern: addMethod === "quick" ? patternUsed : "",
         source: "library",
         confidence,
         correctness,
         timeTaken: Number(timeTaken),
         hintsUsed: Number(hintsUsed),
-        submissionCount: Number(submissionCount),
-        generationStrategy: addMethod,
-        personalNotes: addMethod === "quick" ? personalNotes : "",
-        programmingLanguage: addMethod === "solution" ? programmingLanguage : "",
-        solutionCode: addMethod === "solution" ? solutionCode : ""
+        submissionCount: Number(submissionCount)
       };
 
       const res = await addRevisionItem(payload);
@@ -219,17 +207,12 @@ function RevisionHubContent() {
         url: extUrl,
         difficulty: extDifficulty,
         tags: extTags.length > 0 ? extTags : ["external"],
-        pattern: addMethod === "quick" ? patternUsed : "",
         source: "external",
         confidence,
         correctness,
         timeTaken: Number(timeTaken),
         hintsUsed: Number(hintsUsed),
-        submissionCount: Number(submissionCount),
-        generationStrategy: addMethod,
-        personalNotes: addMethod === "quick" ? personalNotes : "",
-        programmingLanguage: addMethod === "solution" ? programmingLanguage : "",
-        solutionCode: addMethod === "solution" ? solutionCode : ""
+        submissionCount: Number(submissionCount)
       };
 
       const res = await addRevisionItem(payload);
@@ -242,6 +225,37 @@ function RevisionHubContent() {
       }
     } catch (err) {
       setErrorMessage(err.response?.data?.message || "An error occurred.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
+  const handleRateReview = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      let recall = "Partially";
+      if (rateConfidence >= 4) recall = "Yes";
+      else if (rateConfidence <= 2) recall = "No";
+
+      const res = await fetch("/api/revision", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: rateItemId,
+          recall,
+          confidence: rateConfidence,
+          timeTaken: Number(rateTimeTaken),
+          hintsUsed: Number(rateHintsUsed),
+        })
+      });
+      if (res.ok) {
+        setShowRateModal(false);
+        loadData();
+      }
+    } catch (err) {
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
@@ -283,6 +297,16 @@ function RevisionHubContent() {
           </p>
         </div>
         <div className="rev-action-buttons">
+
+          <button 
+            className="btn btn-secondary btn-sm" 
+            onClick={() => router.push("/revision/analytics")}
+            style={{ display: "flex", alignItems: "center", gap: "6px" }}
+          >
+            <BarChart2 size={14} />
+            <span>Topic wise analysis</span>
+          </button>
+
           <button 
             className="btn btn-secondary btn-sm" 
             onClick={() => router.push("/revision/list")}
@@ -342,7 +366,7 @@ function RevisionHubContent() {
       </div>
 
       {/* Core Split Layout */}
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-1" style={{ alignItems: "start" }}>
         
         {/* Left Column: Due Today Dashboard Queue */}
         <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -351,16 +375,6 @@ function RevisionHubContent() {
               <Brain size={18} style={{ color: "var(--primary-light)" }} />
               Due Today Review Queue
             </h3>
-            {revisionData.dueToday.length > 0 && (
-              <button 
-                className="btn btn-primary btn-sm" 
-                onClick={() => router.push("/revision/session")}
-                style={{ display: "flex", alignItems: "center", gap: "4px" }}
-              >
-                <Play size={12} fill="white" />
-                <span>Start Review</span>
-              </button>
-            )}
           </div>
 
           {/* Daily limit setting input */}
@@ -424,6 +438,38 @@ function RevisionHubContent() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: "6px" }}>
+                    <a 
+                      href={item.url} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: "0.35rem 0.5rem", borderRadius: "8px", fontSize: "0.7rem", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <ExternalLink size={12} /> Open Solution
+                    </a>
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        setRateItemId(item._id);
+                        setRateConfidence(item.confidence || 3);
+                        setRateTimeTaken(item.timeTaken || 20);
+                        setRateHintsUsed(item.hintsUsed || 0);
+                        setShowRateModal(true);
+                      }}
+                      style={{ padding: "0.35rem 0.5rem", borderRadius: "8px", fontSize: "0.7rem" }}
+                    >
+                      Rate your review
+                    </button>
+                    <button 
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        const prompt = "Please provide a comprehensive summary for my solution. Format your response with clear markdown headings. Analyze the following:\n1. Time and Space Complexity (TC/SC)\n2. The algorithm pattern used\n3. The core topic/concept\n4. Potential improvements or optimizations\n5. Common mistakes to avoid when writing this approach.\n\nHere is my code:\n\n";
+                        router.push(`/mentor?initialPrompt=${encodeURIComponent(prompt)}`);
+                      }}
+                      style={{ padding: "0.35rem 0.5rem", borderRadius: "8px", fontSize: "0.7rem", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <Sparkles size={12} /> Get AI Summary
+                    </button>
                     <button 
                       className="btn btn-danger btn-sm"
                       onClick={() => handleDeleteItem(item._id)}
@@ -438,84 +484,6 @@ function RevisionHubContent() {
             )}
           </div>
         </div>
-
-        {/* Right Column: Strength Readiness Dashboard */}
-        <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-ice)", paddingBottom: "0.75rem" }}>
-            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "8px" }}>
-              <TrendingUp size={18} style={{ color: "var(--primary-light)" }} />
-              Strength Readiness Dashboard
-            </h3>
-            <button 
-              className="btn btn-secondary btn-sm"
-              onClick={() => router.push("/revision/analytics")}
-              style={{ display: "flex", alignItems: "center", gap: "4px" }}
-            >
-              <BarChart2 size={12} />
-              <span>Full Analytics</span>
-            </button>
-          </div>
-
-          {/* Recommendations alert */}
-          <div className="rev-recommendation-card" style={{ background: "rgba(139, 92, 246, 0.05)", borderLeft: "4px solid var(--accent-color)", padding: "0.85rem", borderRadius: "8px" }}>
-            <h4 style={{ fontSize: "0.8rem", color: "white", display: "flex", alignItems: "center", gap: "6px", margin: "0 0 6px" }}>
-              <Sparkles size={14} style={{ color: "var(--text-warning)" }} />
-              Engine Recommendations
-            </h4>
-            {revisionData.weakTopics.length > 0 ? (
-              <div>
-                <p style={{ fontSize: "0.75rem", margin: "0 0 6px", color: "var(--text-secondary)" }}>
-                  Weak areas detected: <strong style={{ color: "var(--text-danger)" }}>{revisionData.weakTopics.join(", ")}</strong>
-                </p>
-                {recommendedToday.length > 0 && (
-                  <p style={{ fontSize: "0.75rem", margin: "0", color: "var(--text-secondary)" }}>
-                    Recommended today: <strong style={{ color: "white" }}>{recommendedToday.map(r => r.title).join(", ")}</strong>
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p style={{ fontSize: "0.75rem", margin: "0", color: "var(--text-secondary)" }}>
-                You have healthy topic scores! Keep adding solved problems to maintainspaced-repetition tracking.
-              </p>
-            )}
-          </div>
-
-          {/* Topic mastery list */}
-          <div style={{ display: "flex", flexDirection: "column", marginTop: "0.5rem" }}>
-            {Array.from(new Set([
-              "arrays", "strings", "trees", "graphs", "dp", 
-              "binary search", "two pointers", "sliding window", "backtracking", "linked list", "stack", "greedy", "heap",
-              ...(Object.keys(revisionData.topicScores || {}))
-            ])).map((topic) => {
-              const score = revisionData.topicScores[topic] !== undefined ? revisionData.topicScores[topic] : 100;
-              
-              // Formatting the display topic
-              let displayTopic = topic;
-              if (topic === "dp") displayTopic = "Dynamic Programming";
-              else if (topic === "dfs") displayTopic = "DFS";
-              else if (topic === "bfs") displayTopic = "BFS";
-              else {
-                displayTopic = topic.split(' ')
-                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(' ');
-              }
-              
-              return (
-                <div key={topic} className="rev-topic-progress-row">
-                  <div className="rev-topic-progress-header">
-                    <span>{displayTopic}</span>
-                    <span style={{ fontWeight: "700", color: score < 60 ? "var(--text-danger)" : "white" }}>{score}%</span>
-                  </div>
-                  <div className="rev-topic-progress-bar-bg">
-                    <div className="rev-topic-progress-bar-fill" style={{ width: `${score}%` }} />
-                  </div>
-                  {score < 60 && <span className="rev-topic-weak-tag">Weak Topic</span>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
       </div>
 
       {/* ================= ADD FROM LIBRARY MODAL ================= */}
@@ -531,38 +499,6 @@ function RevisionHubContent() {
             <form onSubmit={handleAddLibraryProblem}>
               <div className="rev-modal-body">
                 
-
-                {/* Method Selection Step */}
-                {!addMethod && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                    <div 
-                      onClick={() => setAddMethod("quick")}
-                      style={{ padding: "1.5rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-ice)", borderRadius: "12px", cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}
-                      onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
-                      onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-ice)"}
-                    >
-                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⚡</div>
-                      <h4 style={{ margin: "0 0 0.5rem 0", color: "white" }}>Quick Add</h4>
-                      <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>Fast setup using pattern and personal notes.</p>
-                    </div>
-                    <div 
-                      onClick={() => setAddMethod("solution")}
-                      style={{ padding: "1.5rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-ice)", borderRadius: "12px", cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}
-                      onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
-                      onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-ice)"}
-                    >
-                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🧠</div>
-                      <h4 style={{ margin: "0 0 0.5rem 0", color: "white" }}>Add With Solution</h4>
-                      <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>Advanced AI analysis using solution code.</p>
-                    </div>
-                  </div>
-                )}
-
-{errorMessage && (
-                  <div style={{ padding: "0.6rem 0.85rem", background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--danger)", borderRadius: "8px", color: "var(--text-danger)", fontSize: "0.75rem", marginBottom: "1rem" }}>
-                    {errorMessage}
-                  </div>
-                )}
 
                 {/* Library Problem Selector */}
                 <div className="rev-form-group">
@@ -590,64 +526,10 @@ function RevisionHubContent() {
 
                 {/* Performance Signals Form Part */}
                 
-                {addMethod && (
-                  <div style={{ borderTop: "1px solid var(--border-ice)", paddingTop: "1rem", marginTop: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <h4 style={{ fontSize: "0.85rem", color: "white", margin: "0" }}>
-                        {addMethod === "quick" ? "⚡ Quick Add Configuration" : "🧠 Solution Analysis Configuration"}
-                      </h4>
-                      <button type="button" onClick={() => setAddMethod(null)} className="btn btn-secondary btn-sm" style={{ padding: "0.2rem 0.5rem", fontSize: "0.7rem" }}>Change Method</button>
-                    </div>
+                
 
-                    {addMethod === "quick" && (
-                      <>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Algorithm Pattern Used <span style={{color: "var(--danger)"}}>*</span></label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Sliding Window, BFS, Two Pointers"
-                            value={patternUsed}
-                            onChange={(e) => setPatternUsed(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Personal Notes (Optional)</label>
-                          <textarea
-                            placeholder="Add your thought process, approach, or key constraints here..."
-                            value={personalNotes}
-                            onChange={(e) => setPersonalNotes(e.target.value)}
-                            style={{ minHeight: "80px", resize: "vertical" }}
-                          />
-                        </div>
-                      </>
-                    )}
 
-                    {addMethod === "solution" && (
-                      <>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Programming Language</label>
-                          <select value={programmingLanguage} onChange={(e) => setProgrammingLanguage(e.target.value)} style={{ background: "#0a0d14" }}>
-                            <option value="Python">Python</option>
-                            <option value="C++">C++</option>
-                            <option value="Java">Java</option>
-                            <option value="JavaScript">JavaScript</option>
-                          </select>
-                        </div>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Solution Code <span style={{color: "var(--danger)"}}>*</span></label>
-                          <textarea
-                            placeholder="Paste your solution code here for AI analysis..."
-                            value={solutionCode}
-                            onChange={(e) => setSolutionCode(e.target.value)}
-                            style={{ minHeight: "150px", resize: "vertical", fontFamily: "monospace" }}
-                            required
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                
 
 <div style={{ borderTop: "1px solid var(--border-ice)", paddingTop: "1rem", marginTop: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <h4 style={{ fontSize: "0.85rem", color: "white", margin: "0" }}>Your Solving Performance Signals</h4>
@@ -735,7 +617,7 @@ function RevisionHubContent() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddLibraryModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting || !addMethod}>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? "Adding..." : "Add to Revision Hub"}
                 </button>
               </div>
@@ -757,38 +639,6 @@ function RevisionHubContent() {
             <form onSubmit={handleAddExternalProblem}>
               <div className="rev-modal-body">
                 
-
-                {/* Method Selection Step */}
-                {!addMethod && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                    <div 
-                      onClick={() => setAddMethod("quick")}
-                      style={{ padding: "1.5rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-ice)", borderRadius: "12px", cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}
-                      onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
-                      onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-ice)"}
-                    >
-                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⚡</div>
-                      <h4 style={{ margin: "0 0 0.5rem 0", color: "white" }}>Quick Add</h4>
-                      <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>Fast setup using pattern and personal notes.</p>
-                    </div>
-                    <div 
-                      onClick={() => setAddMethod("solution")}
-                      style={{ padding: "1.5rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-ice)", borderRadius: "12px", cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}
-                      onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
-                      onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-ice)"}
-                    >
-                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🧠</div>
-                      <h4 style={{ margin: "0 0 0.5rem 0", color: "white" }}>Add With Solution</h4>
-                      <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>Advanced AI analysis using solution code.</p>
-                    </div>
-                  </div>
-                )}
-
-{errorMessage && (
-                  <div style={{ padding: "0.6rem 0.85rem", background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--danger)", borderRadius: "8px", color: "var(--text-danger)", fontSize: "0.75rem", marginBottom: "1rem" }}>
-                    {errorMessage}
-                  </div>
-                )}
 
                 {/* External Info Fields */}
                 <div className="rev-form-group">
@@ -857,64 +707,10 @@ function RevisionHubContent() {
 
                 {/* Performance Signals Form Part */}
                 
-                {addMethod && (
-                  <div style={{ borderTop: "1px solid var(--border-ice)", paddingTop: "1rem", marginTop: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <h4 style={{ fontSize: "0.85rem", color: "white", margin: "0" }}>
-                        {addMethod === "quick" ? "⚡ Quick Add Configuration" : "🧠 Solution Analysis Configuration"}
-                      </h4>
-                      <button type="button" onClick={() => setAddMethod(null)} className="btn btn-secondary btn-sm" style={{ padding: "0.2rem 0.5rem", fontSize: "0.7rem" }}>Change Method</button>
-                    </div>
+                
 
-                    {addMethod === "quick" && (
-                      <>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Algorithm Pattern Used <span style={{color: "var(--danger)"}}>*</span></label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Sliding Window, BFS, Two Pointers"
-                            value={patternUsed}
-                            onChange={(e) => setPatternUsed(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Personal Notes (Optional)</label>
-                          <textarea
-                            placeholder="Add your thought process, approach, or key constraints here..."
-                            value={personalNotes}
-                            onChange={(e) => setPersonalNotes(e.target.value)}
-                            style={{ minHeight: "80px", resize: "vertical" }}
-                          />
-                        </div>
-                      </>
-                    )}
 
-                    {addMethod === "solution" && (
-                      <>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Programming Language</label>
-                          <select value={programmingLanguage} onChange={(e) => setProgrammingLanguage(e.target.value)} style={{ background: "#0a0d14" }}>
-                            <option value="Python">Python</option>
-                            <option value="C++">C++</option>
-                            <option value="Java">Java</option>
-                            <option value="JavaScript">JavaScript</option>
-                          </select>
-                        </div>
-                        <div className="rev-form-group">
-                          <label className="rev-form-label">Solution Code <span style={{color: "var(--danger)"}}>*</span></label>
-                          <textarea
-                            placeholder="Paste your solution code here for AI analysis..."
-                            value={solutionCode}
-                            onChange={(e) => setSolutionCode(e.target.value)}
-                            style={{ minHeight: "150px", resize: "vertical", fontFamily: "monospace" }}
-                            required
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                
 
 <div style={{ borderTop: "1px solid var(--border-ice)", paddingTop: "1rem", marginTop: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <h4 style={{ fontSize: "0.85rem", color: "white", margin: "0" }}>Your Solving Performance Signals</h4>
@@ -1002,8 +798,73 @@ function RevisionHubContent() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddExternalModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting || !addMethod}>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? "Adding..." : "Add to Revision Hub"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* ================= RATE REVIEW MODAL ================= */}
+      {showRateModal && (
+        <div className="rev-modal-overlay">
+          <div className="rev-modal" style={{ maxWidth: "400px" }}>
+            <div className="rev-modal-header">
+              <h3 style={{ fontSize: "1.1rem" }}>Rate Your Review</h3>
+              <button className="btn btn-secondary btn-sm" style={{ padding: "0.25rem", borderRadius: "50%" }} onClick={() => setShowRateModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleRateReview}>
+              <div className="rev-modal-body">
+                <div className="rev-rating-selector" style={{ marginBottom: "1rem" }}>
+                  <label className="rev-form-label">Confidence Rating</label>
+                  {confidenceLabels.map(lbl => (
+                    <div 
+                      key={lbl.value} 
+                      className={`rev-rating-option ${rateConfidence === lbl.value ? "rev-rating-option-selected" : ""}`}
+                      onClick={() => setRateConfidence(lbl.value)}
+                    >
+                      <div className="rev-rating-num">{lbl.value}</div>
+                      <div>
+                        <span className="rev-rating-label">{lbl.name}</span>
+                        <p style={{ fontSize: "0.65rem", color: "var(--text-secondary)", margin: "0" }}>{lbl.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rev-form-group" style={{ marginBottom: "1rem" }}>
+                  <label className="rev-form-label">Time Taken (minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="200"
+                    value={rateTimeTaken}
+                    onChange={(e) => setRateTimeTaken(e.target.value)}
+                  />
+                </div>
+
+                <div className="rev-form-group">
+                  <label className="rev-form-label">Hints Used (count)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={rateHintsUsed}
+                    onChange={(e) => setRateHintsUsed(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div style={{ padding: "1.25rem 1.5rem", borderTop: "1px solid var(--border-ice)", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowRateModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? "Saving..." : "Save Review"}
                 </button>
               </div>
             </form>

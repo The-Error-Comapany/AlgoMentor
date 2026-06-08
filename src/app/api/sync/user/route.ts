@@ -11,7 +11,6 @@ import {
 } from "@/lib/adapters/leetcode";
 import {
   fetchCFUser,
-  fetchCFRatingHistory,
   fetchCFSubmissions,
   computeCFTopicStats,
 } from "@/lib/adapters/codeforces";
@@ -61,14 +60,7 @@ export async function POST(request: NextRequest) {
         const ranking = stats.profile?.ranking || undefined;
         const contestsAttended = contestRating?.ranking?.attendedContestsCount || 0;
 
-        // Process LeetCode Rating History
-        const lcHistory = (contestRating?.history || [])
-          .filter((h: any) => h.attended)
-          .map((h: any) => ({
-            contestName: h.contest?.title || "Contest",
-            rating: Math.round(h.rating),
-            date: new Date(h.contest?.startTime * 1000)
-          }));
+
 
         // Extract LeetCode active dates and streak
         let lcActiveDates: string[] = [];
@@ -111,7 +103,7 @@ export async function POST(request: NextRequest) {
             rating,
             ranking,
             contestsAttended,
-            ratingHistory: lcHistory,
+
             streak,
             weeklySolved,
             activeDates: lcActiveDates,
@@ -170,10 +162,7 @@ export async function POST(request: NextRequest) {
           console.error(`Error fetching CF User info for ${cfHandle}:`, err);
           return null;
         }),
-        fetchCFRatingHistory(cfHandle).catch((err) => {
-          console.error(`Error fetching CF Rating History for ${cfHandle}:`, err);
-          return [];
-        }),
+
         fetchCFSubmissions(cfHandle, 20).catch((err) => {
           console.error(`Error fetching CF Submissions for ${cfHandle}:`, err);
           return [];
@@ -182,15 +171,10 @@ export async function POST(request: NextRequest) {
           console.error(`Error computing CF Topic Stats for ${cfHandle}:`, err);
           return { topicStats: {}, activeDates: [], weeklySolved: 0, totalUniqueSolved: 0 };
         }),
-      ]).then(async ([user, ratingHistory, submissions, { topicStats, activeDates, weeklySolved, totalUniqueSolved }]) => {
+      ]).then(async ([user, submissions, { topicStats, activeDates, weeklySolved, totalUniqueSolved }]) => {
         if (!user) return;
 
-        // 1. Process Rating History & UserStats
-        const formattedHistory = (ratingHistory || []).map((h: any) => ({
-          contestName: h.contestName,
-          rating: h.newRating,
-          date: new Date(h.ratingUpdateTimeSeconds * 1000),
-        }));
+
 
         const solved = totalUniqueSolved;
 
@@ -203,7 +187,7 @@ export async function POST(request: NextRequest) {
             maxRating: user.maxRating,
             rank: user.rank,
             solved,
-            ratingHistory: formattedHistory,
+
             weeklySolved,
             activeDates: activeDates || [],
             lastSynced: new Date(),

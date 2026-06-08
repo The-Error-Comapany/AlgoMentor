@@ -14,8 +14,7 @@ function ProfileContent() {
   const [topics, setTopics] = useState([]);
   const [animated, setAnimated] = useState(false);
 
-  // Hover state for chart tooltip
-  const [hoveredPoint, setHoveredPoint] = useState(null); // { platform, rating, x, y }
+
 
   useEffect(() => {
     const timer = setTimeout(() => setAnimated(true), 100);
@@ -188,42 +187,7 @@ function ProfileContent() {
   const strengthTags = sortedTopics.slice(0, 10).map(t => t.topic);
   const weaknessTags = sortedTopics.slice(-10).reverse().map(t => t.topic);
 
-  // SVG Ratings history calculations
-  const getChartPoints = () => {
-    const lcHistory = (lcStats?.ratingHistory || []).slice(-6);
-    const cfHistory = (cfStats?.ratingHistory || []).slice(-6);
-    
-    if (lcHistory.length === 0 && cfHistory.length === 0) {
-      return { chartPointsLC: [], chartPointsCF: [] };
-    }
-    
-    const allRatings = [
-      ...lcHistory.map((h) => h.rating),
-      ...cfHistory.map((h) => h.rating)
-    ];
-    
-    const minR = Math.min(...allRatings);
-    const maxR = Math.max(...allRatings);
-    const range = maxR - minR || 1;
 
-    const mapPoints = (history) => history.map((h, idx) => {
-      const x = 50 + idx * 100;
-      const y = 160 - ((h.rating - minR) / range) * 120;
-      return {
-        label: `C${idx + 1}`,
-        rating: h.rating,
-        x,
-        y
-      };
-    });
-
-    return {
-      chartPointsLC: mapPoints(lcHistory),
-      chartPointsCF: mapPoints(cfHistory)
-    };
-  };
-
-  const { chartPointsLC, chartPointsCF } = getChartPoints();
 
   if (loadingUser) {
     return (
@@ -352,135 +316,7 @@ function ProfileContent() {
 
       </div>
 
-      {/* 3. Rating Chart: Custom SVG line chart */}
-      <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", position: "relative" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <h3 style={{ fontSize: "1.2rem", fontWeight: "600", margin: "0" }}>Rating Progression History</h3>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.75rem", margin: "4px 0 0" }}>
-              Double-line chart visualizing your rating changes over the past 6 contests
-            </p>
-          </div>
-          
-          {/* Custom Legend */}
-          <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ width: "12px", height: "3px", backgroundColor: "#ffa116", display: "inline-block" }} />
-              <span style={{ color: "var(--text-secondary)" }}>LeetCode</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ width: "12px", height: "3px", backgroundColor: "#318dec", display: "inline-block" }} />
-              <span style={{ color: "var(--text-secondary)" }}>Codeforces</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Double-Line SVG Area */}
-        <div style={{ width: "100%", overflowX: "auto" }}>
-          <div style={{ minWidth: "600px", position: "relative" }}>
-            <svg width="100%" height="220" viewBox="0 0 600 200" style={{ overflow: "visible" }}>
-              {/* Grid Lines */}
-              {[40, 80, 120, 160].map((y) => (
-                <line key={y} x1="30" y1={y} x2="570" y2={y} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-              ))}
-
-              {/* LC Line Path */}
-              {chartPointsLC.length > 0 && (
-                <path
-                  d={chartPointsLC.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ")}
-                  fill="none"
-                  stroke="#ffa116"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ filter: "drop-shadow(0 0 6px rgba(245, 158, 11, 0.3))" }}
-                />
-              )}
-
-              {/* CF Line Path */}
-              {chartPointsCF.length > 0 && (
-                <path
-                  d={chartPointsCF.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ")}
-                  fill="none"
-                  stroke="#318dec"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ filter: "drop-shadow(0 0 6px rgba(49, 141, 236, 0.3))" }}
-                />
-              )}
-
-              {/* LeetCode Interactive Points */}
-              {chartPointsLC.map((p, idx) => (
-                <circle
-                  key={`lc-${idx}`}
-                  cx={p.x}
-                  cy={p.y}
-                  r="5"
-                  fill="#0e1322"
-                  stroke="#ffa116"
-                  strokeWidth="3.5"
-                  style={{ cursor: "pointer", transition: "r 0.15s" }}
-                  onMouseEnter={() => setHoveredPoint({ platform: "LeetCode", rating: p.rating, label: p.label, x: p.x, y: p.y })}
-                  onMouseLeave={() => setHoveredPoint(null)}
-                />
-              ))}
-
-              {/* Codeforces Interactive Points */}
-              {chartPointsCF.map((p, idx) => (
-                <circle
-                  key={`cf-${idx}`}
-                  cx={p.x}
-                  cy={p.y}
-                  r="5"
-                  fill="#0e1322"
-                  stroke="#318dec"
-                  strokeWidth="3.5"
-                  style={{ cursor: "pointer", transition: "r 0.15s" }}
-                  onMouseEnter={() => setHoveredPoint({ platform: "Codeforces", rating: p.rating, label: p.label, x: p.x, y: p.y })}
-                  onMouseLeave={() => setHoveredPoint(null)}
-                />
-              ))}
-
-              {/* X Axis Labels */}
-              {(chartPointsCF.length > 0 ? chartPointsCF : chartPointsLC).map((p, idx) => (
-                <text key={`label-${idx}`} x={p.x} y="185" fill="var(--text-muted)" fontSize="10" textAnchor="middle">
-                  {p.label}
-                </text>
-              ))}
-            </svg>
-
-            {/* Float Tooltip Box */}
-            {hoveredPoint && (
-              <div style={{
-                position: "absolute",
-                left: `${(hoveredPoint.x / 600) * 100}%`,
-                top: `${hoveredPoint.y - 45}px`,
-                transform: "translateX(-50%)",
-                background: "var(--bg-darker)",
-                border: `1px solid ${hoveredPoint.platform === "LeetCode" ? "#ffa116" : "#318dec"}`,
-                borderRadius: "6px",
-                padding: "4px 8px",
-                fontSize: "0.7rem",
-                color: "white",
-                pointerEvents: "none",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-                zIndex: 10
-              }}>
-                <span style={{ fontWeight: "600", color: hoveredPoint.platform === "LeetCode" ? "#ffa116" : "#318dec" }}>
-                  {hoveredPoint.platform}
-                </span>: {hoveredPoint.rating}
-              </div>
-            )}
-
-            {chartPointsCF.length === 0 && chartPointsLC.length === 0 && (
-              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                Link handles and participate in contests to draw ratings timeline.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* 4. Split Layout: Topic Distribution & Strengths/Weaknesses */}
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.5rem" }} className="profile-charts-layout">

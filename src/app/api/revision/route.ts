@@ -3,7 +3,6 @@ import { connectDB } from "@/lib/db/mongoose";
 import RevisionItem from "@/lib/models/RevisionItem";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
-import { generateQuickCard, generateSolutionCard } from "@/lib/aiService";
 
 // Helper to get authenticated User ID from JWT
 function getUserIdFromRequest(req: NextRequest): string | null {
@@ -38,7 +37,7 @@ export async function GET(req: NextRequest) {
     const now = new Date();
 
     // 1. Calculate Topic Scores (average mastery score per tag)
-    const topicStatsMap: { [key: string]: { totalMastery: number; count: number } } = {};
+    const topicStatsMap: { [key: string]: { weightedScore: number; weight: number } } = {};
     let totalMasterySum = 0;
     let completedTodayCount = 0;
 
@@ -58,14 +57,23 @@ export async function GET(req: NextRequest) {
       }
 
       // Add to tag grouping
+      // Add to tag grouping with SM2 Easiness Factor weighting
       const tagsList = item.tags || [];
+      const efWeight = Math.max(0.5, (item.easinessFactor || 2.5) / 2.5);
+      
+      // Decay weight if not reviewed recently
+      const daysSinceReview = (now.getTime() - new Date(item.lastReviewDate).getTime()) / (1000 * 60 * 60 * 24);
+      const timeWeight = Math.max(0.2, 1 - (daysSinceReview * 0.05));
+      
+      const finalWeight = efWeight * timeWeight;
+      
       tagsList.forEach((tag: string) => {
         const cleanTag = tag.trim().toLowerCase();
         if (!topicStatsMap[cleanTag]) {
-          topicStatsMap[cleanTag] = { totalMastery: 0, count: 0 };
+          topicStatsMap[cleanTag] = { weightedScore: 0, weight: 0 };
         }
-        topicStatsMap[cleanTag].totalMastery += item.masteryScore || 0;
-        topicStatsMap[cleanTag].count += 1;
+        topicStatsMap[cleanTag].weightedScore += (item.masteryScore || 0) * finalWeight;
+        topicStatsMap[cleanTag].weight += finalWeight;
       });
     });
 
@@ -77,7 +85,7 @@ export async function GET(req: NextRequest) {
 
     Object.keys(topicStatsMap).forEach((topic) => {
       const stats = topicStatsMap[topic];
-      const avgMastery = Math.round(stats.totalMastery / stats.count);
+      const avgMastery = stats.weight > 0 ? Math.round(stats.weightedScore / stats.weight) : 0;
       topicScores[topic] = avgMastery;
       
       // If average mastery score is below 60, identify as a weak topic
@@ -200,11 +208,7 @@ export async function POST(req: NextRequest) {
       correctness, // boolean
       timeTaken, // minutes
       hintsUsed, // number
-      submissionCount,
-      generationStrategy, // "quick" | "solution"
-      personalNotes,
-      programmingLanguage,
-      solutionCode
+      submissionCount
     } = body;
 
     if (!title || !platform || !url || !difficulty || confidence === undefined || correctness === undefined) {
@@ -275,14 +279,12 @@ export async function POST(req: NextRequest) {
       url,
       difficulty,
       tags: tags || [],
-      pattern: pattern || "",
       source,
       confidence,
       correctness,
       timeTaken,
       hintsUsed,
       submissionCount: submissionCount || 1,
-      personalNotes: personalNotes || "",
       easinessFactor,
       repetitionCount,
       interval,
@@ -291,26 +293,6 @@ export async function POST(req: NextRequest) {
       masteryScore,
       masteryHistory: [{ date: new Date(), score: masteryScore }]
     });
-
-    // Generate AI Knowledge Card inline (so it is saved immediately)
-    try {
-      let card;
-      if (generationStrategy === "solution") {
-        card = await generateSolutionCard(title, difficulty, tags || [], programmingLanguage, solutionCode);
-      } else {
-        card = await generateQuickCard(title, difficulty, tags || [], pattern || "", personalNotes || "");
-      }
-      
-      if (card) {
-        newItem.knowledgeCard = card;
-        newItem.isCardGenerated = true;
-        if (card.pattern && !newItem.pattern) {
-          newItem.pattern = card.pattern;
-        }
-      }
-    } catch (err) {
-      console.error("AI card generation failed on add problem:", err);
-    }
 
     await newItem.save();
 

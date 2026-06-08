@@ -226,6 +226,7 @@ function ProblemsContent() {
               <table>
                 <thead>
                   <tr>
+                    <th style={{ width: "40px", textAlign: "center" }}></th>
                     <th>Problem Name</th>
                     <th>Platform</th>
                     <th>Difficulty</th>
@@ -236,6 +237,12 @@ function ProblemsContent() {
                 <tbody>
                   {paginatedProblems.map((prob) => (
                     <tr key={prob.id}>
+                      <td style={{ textAlign: "center" }}>
+                        <input 
+                          type="checkbox" 
+                          style={{ cursor: "pointer", accentColor: "var(--primary-light)", width: "16px", height: "16px" }}
+                        />
+                      </td>
                       <td>
                         <a 
                           href={prob.url} 

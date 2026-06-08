@@ -25,6 +25,7 @@ function MentorContent() {
   const searchParams = useSearchParams();
   const initProblem = searchParams.get("problem");
   const initPlatform = searchParams.get("platform");
+  const initPrompt = searchParams.get("initialPrompt");
   const { user, accessToken } = useAuth();
 
   // Dynamic user name state
@@ -139,6 +140,13 @@ function MentorContent() {
   
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Auto-fill input if initialPrompt is provided in URL
+  useEffect(() => {
+    if (initPrompt) {
+      setInput(initPrompt);
+    }
+  }, [initPrompt]);
 
   // Left Panel Code Reviewer state
   const [codeToReview, setCodeToReview] = useState(

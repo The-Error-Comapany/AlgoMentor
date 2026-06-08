@@ -7,17 +7,6 @@ export interface IReviewAttempt {
   interval: number;
 }
 
-export interface IKnowledgeCard {
-  pattern?: string;
-  coreIdea?: string;
-  stateDefinition?: string;
-  transitionLogic?: string;
-  timeComplexity?: string;
-  spaceComplexity?: string;
-  commonMistakes?: string;
-  interviewInsights?: string;
-  relatedProblems?: string[];
-}
 
 export interface IRevisionItem extends Document {
   userId: string;
@@ -27,9 +16,7 @@ export interface IRevisionItem extends Document {
   url: string;
   difficulty: string; // Easy, Medium, Hard
   tags: string[];
-  pattern?: string;
   source: "library" | "external";
-  personalNotes?: string;
   
   // Performance signals
   confidence: number; // 1-5
@@ -49,9 +36,7 @@ export interface IRevisionItem extends Document {
   masteryScore: number;
   masteryHistory: { date: Date; score: number }[];
 
-  // AI Card
-  knowledgeCard?: IKnowledgeCard;
-  isCardGenerated: boolean;
+
 
   // History
   reviews: IReviewAttempt[];
@@ -65,9 +50,7 @@ const RevisionItemSchema = new Schema<IRevisionItem>({
   url: { type: String, required: true },
   difficulty: { type: String, required: true },
   tags: [{ type: String }],
-  pattern: { type: String, default: "" },
   source: { type: String, enum: ["library", "external"], required: true },
-  personalNotes: { type: String, default: "" },
 
   // Performance signals
   confidence: { type: Number, required: true, min: 1, max: 5 },
@@ -92,19 +75,7 @@ const RevisionItemSchema = new Schema<IRevisionItem>({
     }
   ],
 
-  // AI Card
-  knowledgeCard: {
-    pattern: { type: String, default: "" },
-    coreIdea: { type: String, default: "" },
-    stateDefinition: { type: String, default: "" },
-    transitionLogic: { type: String, default: "" },
-    timeComplexity: { type: String, default: "" },
-    spaceComplexity: { type: String, default: "" },
-    commonMistakes: { type: String, default: "" },
-    interviewInsights: { type: String, default: "" },
-    relatedProblems: [{ type: String }]
-  },
-  isCardGenerated: { type: Boolean, default: false },
+
 
   // Reviews History
   reviews: [

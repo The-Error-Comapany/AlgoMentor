@@ -1,10 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export interface IRatingHistory {
-  contestName: string;
-  rating: number;
-  date: Date;
-}
+
 
 export interface IUserStats extends Document {
   userId: string;
@@ -18,7 +14,7 @@ export interface IUserStats extends Document {
   hardSolved?: number;
   ranking?: number;
   contestsAttended?: number;
-  ratingHistory: IRatingHistory[];
+
   streak?: number;
   weeklySolved?: number;
   activeDates?: string[];
@@ -37,13 +33,7 @@ const UserStatsSchema = new Schema<IUserStats>({
   hardSolved: { type: Number },
   ranking: { type: Number },
   contestsAttended: { type: Number },
-  ratingHistory: [
-    {
-      contestName: { type: String, required: true },
-      rating: { type: Number, required: true },
-      date: { type: Date, required: true },
-    },
-  ],
+
   streak: { type: Number },
   weeklySolved: { type: Number },
   activeDates: [{ type: String }],
