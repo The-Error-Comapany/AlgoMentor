@@ -9,11 +9,12 @@ import {
   ExternalLink, Sparkles, AlertTriangle, RefreshCw, BarChart2, List
 } from "lucide-react";
 import { allProblems } from "@/lib/problemsData";
-import { 
+import {
   fetchRevisionItems, 
   addRevisionItem, 
   updateDailyLimit, 
-  deleteRevisionItem 
+  deleteRevisionItem,
+  updateRevisionReview
 } from "@/services/revisionService";
 import "./Revision.css";
 
@@ -62,8 +63,9 @@ function RevisionHubContent() {
   const [showRateModal, setShowRateModal] = useState(false);
   const [rateItemId, setRateItemId] = useState(null);
   const [rateConfidence, setRateConfidence] = useState(3);
-  const [rateTimeTaken, setRateTimeTaken] = useState(20);
-  const [rateHintsUsed, setRateHintsUsed] = useState(0);
+  const [rateTimeTaken, setRateTimeTaken] = useState(5);
+  const [rateHintsUsed, setRateHintsUsed] = useState(1);
+  const [rateError, setRateError] = useState("");
 const ALL_TOPICS = [
     "Arrays", "Strings", "Trees", "Graphs", "DP", "Dynamic Programming", 
     "Sliding Window", "Binary Search", "Backtracking", "Heap", 
@@ -239,23 +241,23 @@ const ALL_TOPICS = [
       if (rateConfidence >= 4) recall = "Yes";
       else if (rateConfidence <= 2) recall = "No";
 
-      const res = await fetch("/api/revision", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: rateItemId,
-          recall,
-          confidence: rateConfidence,
-          timeTaken: Number(rateTimeTaken),
-          hintsUsed: Number(rateHintsUsed),
-        })
+      const res = await updateRevisionReview({
+        id: rateItemId,
+        recall,
+        confidence: rateConfidence,
+        timeTaken: Number(rateTimeTaken),
+        hintsUsed: Number(rateHintsUsed),
       });
-      if (res.ok) {
+
+      if (res.success) {
         setShowRateModal(false);
         loadData();
+      } else {
+        setRateError(res.message || "Failed to save review");
       }
     } catch (err) {
       console.error(err);
+      setRateError(err.response?.data?.message || "An error occurred while saving");
     } finally {
       setSubmitting(false);
     }
@@ -452,8 +454,9 @@ const ALL_TOPICS = [
                       onClick={() => {
                         setRateItemId(item._id);
                         setRateConfidence(item.confidence || 3);
-                        setRateTimeTaken(item.timeTaken || 20);
-                        setRateHintsUsed(item.hintsUsed || 0);
+                        setRateTimeTaken(item.timeTaken || 5);
+                        setRateHintsUsed(item.hintsUsed || 1);
+                        setRateError("");
                         setShowRateModal(true);
                       }}
                       style={{ padding: "0.35rem 0.5rem", borderRadius: "8px", fontSize: "0.7rem" }}
@@ -858,6 +861,11 @@ const ALL_TOPICS = [
                     onChange={(e) => setRateHintsUsed(e.target.value)}
                   />
                 </div>
+                {rateError && (
+                  <div style={{ color: "var(--danger)", fontSize: "0.8rem", marginTop: "0.5rem" }}>
+                    {rateError}
+                  </div>
+                )}
               </div>
               <div style={{ padding: "1.25rem 1.5rem", borderTop: "1px solid var(--border-ice)", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowRateModal(false)}>
