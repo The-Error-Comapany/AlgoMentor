@@ -11,7 +11,7 @@ export interface IPotd extends Document {
 }
 
 const PotdSchema = new Schema<IPotd>({
-  date: { type: String, required: true, unique: true },
+  date: { type: String, required: true },
   platform: { type: String, required: true },
   title: { type: String, required: true },
   difficulty: { type: String, required: true },
@@ -23,6 +23,8 @@ const PotdSchema = new Schema<IPotd>({
     expires: 48 * 60 * 60 // 48 hours in seconds
   },
 });
+
+PotdSchema.index({ date: 1, platform: 1 }, { unique: true });
 
 export default mongoose.models.Potd || mongoose.model<IPotd>("Potd", PotdSchema);
 export { PotdSchema };

@@ -4,6 +4,7 @@ import Contest from "@/lib/models/Contest";
 import Potd from "@/lib/models/Potd";
 import { fetchLCPOTD, fetchLCUpcomingContests } from "@/lib/adapters/leetcode";
 import { fetchCFUpcomingContests } from "@/lib/adapters/codeforces";
+import { fetchGFGPOTD } from "@/lib/adapters/geeksforgeeks";
 
 export async function GET(request: NextRequest) {
   return POST(request);
@@ -25,21 +26,45 @@ export async function POST(request: NextRequest) {
             ? potd.link
             : `https://leetcode.com${potd.link}`;
 
+            await Potd.findOneAndUpdate(
+              { date, platform: "leetcode" },
+              {
+                date,
+                platform: "leetcode",
+                title: potd.question?.title || "Daily Challenge",
+                difficulty: potd.question?.difficulty || "Medium",
+                url,
+                tags,
+              },
+              { upsert: true, new: true }
+            );
+        })
+        .catch((err) => {
+          console.error("Error syncing LeetCode POTD:", err);
+        }),
+
+      // Sync GFG POTD
+      fetchGFGPOTD()
+        .then(async (potd) => {
+          if (!potd) return;
+          const date = potd.date.split(" ")[0]; // Get YYYY-MM-DD
+          const tags = potd.tags?.topic_tags || [];
+          
           await Potd.findOneAndUpdate(
-            { date },
+            { date, platform: "geeksforgeeks" },
             {
               date,
-              platform: "leetcode",
-              title: potd.question?.title || "Daily Challenge",
-              difficulty: potd.question?.difficulty || "Medium",
-              url,
+              platform: "geeksforgeeks",
+              title: potd.problem_name,
+              difficulty: potd.difficulty,
+              url: potd.problem_url,
               tags,
             },
             { upsert: true, new: true }
           );
         })
         .catch((err) => {
-          console.error("Error syncing LeetCode POTD:", err);
+          console.error("Error syncing GFG POTD:", err);
         }),
 
       // 2. Sync LeetCode Upcoming Contests

@@ -43,6 +43,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    gfgHandle: {
+      type: String,
+      default: "",
+    },
     weeklyGoalTarget: {
       type: Number,
       default: 10,

@@ -23,12 +23,14 @@ function SettingsContent() {
 
   const [handles, setHandles] = useState({
     leetcode: "",
-    codeforces: ""
+    codeforces: "",
+    geeksforgeeks: ""
   });
 
   const [syncStatus, setSyncStatus] = useState({
     leetcode: "unlinked", // verified | unlinked | verifying
-    codeforces: "unlinked"
+    codeforces: "unlinked",
+    geeksforgeeks: "unlinked"
   });
 
   const [loadingPlatform, setLoadingPlatform] = useState(null);
@@ -44,11 +46,13 @@ function SettingsContent() {
       });
       setHandles({
         leetcode: user.lcHandle || "",
-        codeforces: user.cfHandle || ""
+        codeforces: user.cfHandle || "",
+        geeksforgeeks: user.gfgHandle || ""
       });
       setSyncStatus({
         leetcode: user.lcHandle ? "verified" : "unlinked",
-        codeforces: user.cfHandle ? "verified" : "unlinked"
+        codeforces: user.cfHandle ? "verified" : "unlinked",
+        geeksforgeeks: user.gfgHandle ? "verified" : "unlinked"
       });
     }
   }, [user]);
@@ -71,7 +75,7 @@ function SettingsContent() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          [platform === "leetcode" ? "lcHandle" : "cfHandle"]: handle
+          [platform === "leetcode" ? "lcHandle" : platform === "codeforces" ? "cfHandle" : "gfgHandle"]: handle
         })
       });
       
@@ -89,7 +93,7 @@ function SettingsContent() {
         },
         body: JSON.stringify({
           userId: user?._id || profileData.user?._id,
-          [platform === "leetcode" ? "lcHandle" : "cfHandle"]: handle
+          [platform === "leetcode" ? "lcHandle" : platform === "codeforces" ? "cfHandle" : "gfgHandle"]: handle
         })
       });
 
@@ -99,7 +103,7 @@ function SettingsContent() {
       }
 
       setSyncStatus(prev => ({ ...prev, [platform]: "verified" }));
-      alert(`${platform === "leetcode" ? "LeetCode" : "Codeforces"} handle linked and synchronized successfully!`);
+      alert(`${platform === "leetcode" ? "LeetCode" : platform === "codeforces" ? "Codeforces" : "GeeksforGeeks"} handle linked and synchronized successfully!`);
     } catch (err) {
       console.error(err);
       alert(err.message || `Failed to verify/sync ${platform}`);
@@ -110,7 +114,7 @@ function SettingsContent() {
   };
 
   const handleUnlink = async (platform) => {
-    if (!confirm(`Are you sure you want to unlink your ${platform === "leetcode" ? "LeetCode" : "Codeforces"} handle?`)) return;
+    if (!confirm(`Are you sure you want to unlink your ${platform === "leetcode" ? "LeetCode" : platform === "codeforces" ? "Codeforces" : "GeeksforGeeks"} handle?`)) return;
 
     try {
       const token = localStorage.getItem("accessToken");
@@ -121,7 +125,7 @@ function SettingsContent() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          [platform === "leetcode" ? "lcHandle" : "cfHandle"]: ""
+          [platform === "leetcode" ? "lcHandle" : platform === "codeforces" ? "cfHandle" : "gfgHandle"]: ""
         })
       });
       const profileData = await profileRes.json();
@@ -129,7 +133,7 @@ function SettingsContent() {
         setUser(profileData.user);
         setSyncStatus(prev => ({ ...prev, [platform]: "unlinked" }));
         setHandles(prev => ({ ...prev, [platform]: "" }));
-        alert(`${platform === "leetcode" ? "LeetCode" : "Codeforces"} handle unlinked successfully.`);
+        alert(`${platform === "leetcode" ? "LeetCode" : platform === "codeforces" ? "Codeforces" : "GeeksforGeeks"} handle unlinked successfully.`);
       } else {
         alert(profileData.message || "Failed to unlink handle");
       }
@@ -422,6 +426,56 @@ function SettingsContent() {
                 {syncStatus.codeforces === "unlinked" && (
                   <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", display: "block" }}>
                     Not linked. RATING metrics will be unavailable in profile summary.
+                  </span>
+                )}
+              </div>
+
+              {/* GeeksforGeeks Sync */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label style={{ fontSize: "0.75rem", color: "#2f8d46", fontWeight: "600" }}>GeeksforGeeks Handle</label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    type="text"
+                    placeholder="GeeksforGeeks Username"
+                    value={handles.geeksforgeeks}
+                    onChange={(e) => setHandles({ ...handles, geeksforgeeks: e.target.value })}
+                    disabled={syncStatus.geeksforgeeks === "verified" || syncStatus.geeksforgeeks === "verifying"}
+                    style={{ borderColor: syncStatus.geeksforgeeks === "verified" ? "rgba(16, 185, 129, 0.3)" : "" }}
+                  />
+
+                  {syncStatus.geeksforgeeks === "verified" ? (
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button 
+                        className="btn btn-primary btn-sm" 
+                        style={{ padding: "0 1rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }} 
+                        onClick={() => handleVerifySync("geeksforgeeks")}
+                        disabled={loadingPlatform === "geeksforgeeks"}
+                      >
+                        {loadingPlatform === "geeksforgeeks" ? <RefreshCw size={12} className="pulse-green" /> : <RefreshCw size={12} />}
+                        <span>Sync</span>
+                      </button>
+                      <button className="btn btn-danger btn-sm" style={{ padding: "0 1rem", fontSize: "0.75rem" }} onClick={() => handleUnlink("geeksforgeeks")}>Unlink</button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      style={{ padding: "0 1rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}
+                      onClick={() => handleVerifySync("geeksforgeeks")}
+                      disabled={syncStatus.geeksforgeeks === "verifying" || !handles.geeksforgeeks.trim()}
+                    >
+                      {syncStatus.geeksforgeeks === "verifying" ? <RefreshCw size={12} className="pulse-green" /> : null}
+                      <span>{syncStatus.geeksforgeeks === "verifying" ? "Syncing..." : "Verify & Sync"}</span>
+                    </button>
+                  )}
+                </div>
+                {syncStatus.geeksforgeeks === "verified" && (
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-success)", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <CheckCircle size={10} /> Active connected handle: verified and operational
+                  </span>
+                )}
+                {syncStatus.geeksforgeeks === "unlinked" && (
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", display: "block" }}>
+                    Not linked. GFG metrics will be unavailable in dashboard.
                   </span>
                 )}
               </div>

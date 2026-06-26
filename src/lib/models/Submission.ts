@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface ISubmission extends Document {
   userId: string;
-  platform: "leetcode" | "codeforces";
+  platform: "leetcode" | "codeforces" | "geeksforgeeks";
   title: string;
   titleSlug: string;
   verdict: string;
@@ -12,7 +12,7 @@ export interface ISubmission extends Document {
 
 const SubmissionSchema = new Schema<ISubmission>({
   userId: { type: String, required: true },
-  platform: { type: String, enum: ["leetcode", "codeforces"], required: true },
+  platform: { type: String, enum: ["leetcode", "codeforces", "geeksforgeeks"], required: true },
   title: { type: String, required: true },
   titleSlug: { type: String, required: true },
   verdict: { type: String, required: true },

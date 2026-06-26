@@ -14,12 +14,13 @@ import {
   fetchCFSubmissions,
   computeCFTopicStats,
 } from "@/lib/adapters/codeforces";
+import { fetchGFGStats } from "@/lib/adapters/geeksforgeeks";
 
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
     const body = await request.json();
-    const { userId, lcHandle, cfHandle } = body;
+    const { userId, lcHandle, cfHandle, gfgHandle } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
@@ -230,6 +231,39 @@ export async function POST(request: NextRequest) {
       });
 
       syncPromises.push(cfSync);
+    }
+
+    // GeeksforGeeks sync if gfgHandle is provided
+    if (gfgHandle && gfgHandle.trim() !== "") {
+      const gfgSync = fetchGFGStats(gfgHandle).then(async (data) => {
+        if (!data || !data.userHandle) return;
+
+        const info = data;
+        const solved = info.total_problems_solved || 0;
+        const easySolved = (info.School || 0) + (info.Basic || 0) + (info.Easy || 0);
+        const mediumSolved = info.Medium || 0;
+        const hardSolved = info.Hard || 0;
+        const rating = parseInt(info.total_score) || undefined;
+
+        await UserStats.findOneAndUpdate(
+          { userId, platform: "geeksforgeeks" },
+          {
+            userId,
+            platform: "geeksforgeeks",
+            solved,
+            easySolved,
+            mediumSolved,
+            hardSolved,
+            rating,
+            lastSynced: new Date(),
+          },
+          { upsert: true, new: true }
+        );
+      }).catch((err) => {
+        console.error(`Error fetching GFG Stats for ${gfgHandle}:`, err);
+      });
+
+      syncPromises.push(gfgSync);
     }
 
     if (syncPromises.length > 0) {

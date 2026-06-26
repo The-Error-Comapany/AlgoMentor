@@ -28,7 +28,7 @@ function DashboardContent() {
   const [stats, setStats] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [topics, setTopics] = useState([]);
-  const [potd, setPotd] = useState(null);
+  const [potds, setPotds] = useState([]);
   const [contests, setContests] = useState([]);
   
   // Timers and interactive states
@@ -84,8 +84,10 @@ function DashboardContent() {
       try {
         const potdRes = await fetch("/api/potd");
         const potdData = await potdRes.json();
-        if (potdData && potdData.title) {
-          setPotd(potdData);
+        if (Array.isArray(potdData)) {
+          setPotds(potdData);
+        } else if (potdData && potdData.title) {
+          setPotds([potdData]);
         }
 
         const contestsRes = await fetch("/api/contests");
@@ -148,29 +150,34 @@ function DashboardContent() {
   const activeStats = stats.filter(s => {
     if (s.platform === "leetcode" && !user?.lcHandle) return false;
     if (s.platform === "codeforces" && !user?.cfHandle) return false;
+    if (s.platform === "geeksforgeeks" && !user?.gfgHandle) return false;
     return true;
   });
 
   const activeSubmissions = submissions.filter(s => {
     if (s.platform === "leetcode" && !user?.lcHandle) return false;
     if (s.platform === "codeforces" && !user?.cfHandle) return false;
+    if (s.platform === "geeksforgeeks" && !user?.gfgHandle) return false;
     return true;
   });
 
   const activeTopics = topics.filter(t => {
     if (t.platform === "leetcode" && !user?.lcHandle) return false;
     if (t.platform === "codeforces" && !user?.cfHandle) return false;
+    if (t.platform === "geeksforgeeks" && !user?.gfgHandle) return false;
     return true;
   });
 
   // Aggregated Stats Calculations
   const lcStats = user?.lcHandle ? activeStats.find((s) => s.platform === "leetcode") : null;
   const cfStats = user?.cfHandle ? activeStats.find((s) => s.platform === "codeforces") : null;
+  const gfgStats = user?.gfgHandle ? activeStats.find((s) => s.platform === "geeksforgeeks") : null;
 
   const cfSolved = cfStats?.solved || (user?.cfHandle ? activeTopics.filter(t => t.platform === "codeforces").reduce((sum, t) => sum + t.count, 0) : 0);
-  const totalSolved = (lcStats?.solved || 0) + cfSolved;
+  const totalSolved = (lcStats?.solved || 0) + cfSolved + (gfgStats?.solved || 0);
   const lcRating = lcStats?.rating || null;
   const cfRating = cfStats?.rating || null;
+  const gfgRating = gfgStats?.rating || null;
   const cfRank = cfStats?.rank || "N/A";
 
   const today = new Date();
@@ -181,14 +188,15 @@ function DashboardContent() {
   );
 
   // Calculate weekly goal progress using backend-computed weeklySolved
-  const weeklyProblemsSolved = (lcStats?.weeklySolved || 0) + (cfStats?.weeklySolved || 0);
+  const weeklyProblemsSolved = (lcStats?.weeklySolved || 0) + (cfStats?.weeklySolved || 0) + (gfgStats?.weeklySolved || 0);
   const weeklyGoalTarget = user?.weeklyGoalTarget || 10;
   const weeklyGoalPercent = Math.min(100, Math.round((weeklyProblemsSolved / weeklyGoalTarget) * 100));
 
   // Calculate combined streak from active dates synced from backend
   const combinedActiveDates = new Set([
     ...(lcStats?.activeDates || []),
-    ...(cfStats?.activeDates || [])
+    ...(cfStats?.activeDates || []),
+    ...(gfgStats?.activeDates || [])
   ]);
 
   const calculateCombinedStreak = (datesSet) => {
@@ -247,7 +255,7 @@ function DashboardContent() {
       const sortedTopics = [...activeTopics].sort((a, b) => a.count - b.count);
       const weakTopic = sortedTopics[0]?.topic || "Algorithms";
       setRecommendation(`Based on your synced solve history, we recommend focusing on ${weakTopic} problems. Improving your mastery in this category will help boost your performance.`);
-    } else if (user?.lcHandle || user?.cfHandle) {
+    } else if (user?.lcHandle || user?.cfHandle || user?.gfgHandle) {
       setRecommendation("Generating diagnostic recommendations... Run sync in Settings to fetch your topic distributions.");
     } else {
       setRecommendation("Link your competitive coding handles in Settings to analyze your performance and receive personalized AI recommendations.");
@@ -273,13 +281,13 @@ function DashboardContent() {
             Welcome back, {user?.name || "Developer"}! 👋
           </h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: "0" }}>
-            {user?.lcHandle || user?.cfHandle ? (
+            {user?.lcHandle || user?.cfHandle || user?.gfgHandle ? (
               <>
                 You've solved <span style={{ color: "white", fontWeight: "600" }}>{totalSolved} problems</span> across connected platforms. Keep it up! 🚀
               </>
             ) : (
               <>
-                Get started by linking your <span style={{ color: "var(--primary-light)" }}>LeetCode</span> and <span style={{ color: "var(--text-info)" }}>Codeforces</span> handles in <span style={{ color: "white", cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/settings")}>Settings</span>.
+                Get started by linking your <span style={{ color: "var(--primary-light)" }}>LeetCode</span>, <span style={{ color: "var(--text-info)" }}>Codeforces</span> and <span style={{ color: "#2f8d46" }}>GeeksforGeeks</span> handles in <span style={{ color: "white", cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/settings")}>Settings</span>.
               </>
             )}
           </p>
@@ -317,6 +325,10 @@ function DashboardContent() {
               <span style={{ color: "#318dec" }}>
                 CF: <strong style={{ color: "white" }}>{cfSolved}</strong>
               </span>
+              <span style={{ color: "var(--text-muted)" }}>|</span>
+              <span style={{ color: "#2f8d46" }}>
+                GFG: <strong style={{ color: "white" }}>{gfgStats?.solved || 0}</strong>
+              </span>
             </div>
           </div>
         </div>
@@ -346,6 +358,18 @@ function DashboardContent() {
         </div>
 
         <div className="glass-card" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <div style={{ background: "rgba(47, 141, 70, 0.1)", color: "#2f8d46", width: "42px", height: "42px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Award size={20} />
+          </div>
+          <div>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>GeeksforGeeks Score</span>
+            <h3 style={{ fontSize: "1.4rem", margin: "0", color: "#2f8d46" }}>
+              {gfgRating || "Unlinked"}
+            </h3>
+          </div>
+        </div>
+
+        <div className="glass-card" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "var(--text-danger)", width: "42px", height: "42px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Flame size={20} style={{ color: "var(--danger)" }} />
           </div>
@@ -365,44 +389,58 @@ function DashboardContent() {
         {/* Left Column: POTD & Recent Submissions */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           
-          {/* LeetCode POTD Card */}
-          <div className="glass-card" style={{ 
-            background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(139, 92, 246, 0.03) 100%)",
-            borderColor: "rgba(245, 158, 11, 0.2)",
-            display: "flex", 
-            flexDirection: "column", 
-            gap: "1rem" 
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Flame size={18} style={{ color: "#ffa116" }} />
-                <h3 style={{ fontSize: "1.1rem" }}>Problem of the Day</h3>
-              </div>
-              <span className="badge badge-leetcode" style={{ fontSize: "0.7rem", padding: "0.2rem 0.6rem" }}>LeetCode</span>
-            </div>
-
-            {potd ? (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.2rem", background: "rgba(8, 11, 17, 0.4)", borderRadius: "12px", border: "1px solid var(--border-ice)" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "6px" }}>
-                    <span className={`badge badge-${potd.difficulty.toLowerCase()}`} style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
-                      {potd.difficulty}
+          {/* POTD Cards */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {potds.length > 0 ? (
+              potds.map((potd, idx) => (
+                <div key={idx} className="glass-card" style={{ 
+                  background: potd.platform === "leetcode" 
+                    ? "linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(139, 92, 246, 0.03) 100%)"
+                    : "linear-gradient(135deg, rgba(47, 141, 70, 0.08) 0%, rgba(139, 92, 246, 0.03) 100%)",
+                  borderColor: potd.platform === "leetcode" ? "rgba(245, 158, 11, 0.2)" : "rgba(47, 141, 70, 0.2)",
+                  display: "flex", 
+                  flexDirection: "column", 
+                  gap: "1rem" 
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <Flame size={18} style={{ color: potd.platform === "leetcode" ? "#ffa116" : "#2f8d46" }} />
+                      <h3 style={{ fontSize: "1.1rem" }}>Problem of the Day</h3>
+                    </div>
+                    <span className={`badge ${potd.platform === "leetcode" ? "badge-leetcode" : "badge-geeksforgeeks"}`} style={{ 
+                      fontSize: "0.7rem", 
+                      padding: "0.2rem 0.6rem",
+                      background: potd.platform === "geeksforgeeks" ? "rgba(47, 141, 70, 0.2)" : undefined,
+                      color: potd.platform === "geeksforgeeks" ? "#2f8d46" : undefined,
+                      border: potd.platform === "geeksforgeeks" ? "1px solid rgba(47, 141, 70, 0.3)" : undefined
+                    }}>
+                      {potd.platform === "leetcode" ? "LeetCode" : "GeeksforGeeks"}
                     </span>
-                    {(potd.tags || []).slice(0, 3).map(t => (
-                      <span key={t} style={{ fontSize: "0.7rem", color: "var(--text-secondary)", background: "rgba(255,255,255,0.03)", padding: "0.1rem 0.4rem", borderRadius: "4px" }}>
-                        {t}
-                      </span>
-                    ))}
                   </div>
-                  <h4 style={{ fontSize: "1.1rem", margin: "0", color: "white", fontWeight: "600" }}>{potd.title}</h4>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.2rem", background: "rgba(8, 11, 17, 0.4)", borderRadius: "12px", border: "1px solid var(--border-ice)" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "6px" }}>
+                        <span className={`badge badge-${(potd.difficulty || "medium").toLowerCase()}`} style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
+                          {potd.difficulty}
+                        </span>
+                        {(potd.tags || []).slice(0, 3).map(t => (
+                          <span key={t} style={{ fontSize: "0.7rem", color: "var(--text-secondary)", background: "rgba(255,255,255,0.03)", padding: "0.1rem 0.4rem", borderRadius: "4px" }}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                      <h4 style={{ fontSize: "1.1rem", margin: "0", color: "white", fontWeight: "600" }}>{potd.title}</h4>
+                    </div>
+                    <a href={potd.url} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>Solve Now</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
                 </div>
-                <a href={potd.url} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>Solve Now</span>
-                  <ExternalLink size={14} />
-                </a>
-              </div>
+              ))
             ) : (
-              <div style={{ padding: "1.2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+              <div className="glass-card" style={{ padding: "1.2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
                 No active challenge fetched. Global sync handles are loading.
               </div>
             )}
@@ -447,8 +485,8 @@ function DashboardContent() {
                           </a>
                         </td>
                         <td>
-                          <span className={`badge ${sub.platform === "leetcode" ? "badge-leetcode" : "badge-codeforces"}`} style={{ fontSize: "0.65rem" }}>
-                            {sub.platform === "leetcode" ? "LeetCode" : "Codeforces"}
+                          <span className={`badge ${sub.platform === "leetcode" ? "badge-leetcode" : sub.platform === "codeforces" ? "badge-codeforces" : "badge-geeksforgeeks"}`} style={{ fontSize: "0.65rem", background: sub.platform === "geeksforgeeks" ? "rgba(47, 141, 70, 0.2)" : undefined, color: sub.platform === "geeksforgeeks" ? "#2f8d46" : undefined, border: sub.platform === "geeksforgeeks" ? "1px solid rgba(47, 141, 70, 0.3)" : undefined }}>
+                            {sub.platform === "leetcode" ? "LeetCode" : sub.platform === "codeforces" ? "Codeforces" : "GeeksforGeeks"}
                           </span>
                         </td>
                         <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>{sub.language}</td>

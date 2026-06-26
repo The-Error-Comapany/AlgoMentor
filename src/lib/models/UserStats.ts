@@ -4,7 +4,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IUserStats extends Document {
   userId: string;
-  platform: "leetcode" | "codeforces";
+  platform: "leetcode" | "codeforces" | "geeksforgeeks";
   rating?: number;
   maxRating?: number;
   rank?: string;
@@ -23,7 +23,7 @@ export interface IUserStats extends Document {
 
 const UserStatsSchema = new Schema<IUserStats>({
   userId: { type: String, required: true },
-  platform: { type: String, enum: ["leetcode", "codeforces"], required: true },
+  platform: { type: String, enum: ["leetcode", "codeforces", "geeksforgeeks"], required: true },
   rating: { type: Number },
   maxRating: { type: Number },
   rank: { type: String },

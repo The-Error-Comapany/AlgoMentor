@@ -2,14 +2,14 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface ITopicStat extends Document {
   userId: string;
-  platform: "leetcode" | "codeforces";
+  platform: "leetcode" | "codeforces" | "geeksforgeeks";
   topic: string;
   count: number;
 }
 
 const TopicStatSchema = new Schema<ITopicStat>({
   userId: { type: String, required: true },
-  platform: { type: String, enum: ["leetcode", "codeforces"], required: true },
+  platform: { type: String, enum: ["leetcode", "codeforces", "geeksforgeeks"], required: true },
   topic: { type: String, required: true },
   count: { type: Number, required: true },
 });

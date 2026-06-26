@@ -80,13 +80,14 @@ export async function PUT(req) {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-      const { name, email, lcHandle, cfHandle, weeklyGoalTarget, readAchievements, readContests } = await req.json();
+      const { name, email, lcHandle, cfHandle, gfgHandle, weeklyGoalTarget, readAchievements, readContests } = await req.json();
 
       const updateData = {};
       if (name !== undefined) updateData.name = name;
       if (email !== undefined) updateData.email = email;
       if (lcHandle !== undefined) updateData.lcHandle = lcHandle;
       if (cfHandle !== undefined) updateData.cfHandle = cfHandle;
+      if (gfgHandle !== undefined) updateData.gfgHandle = gfgHandle;
       if (weeklyGoalTarget !== undefined) updateData.weeklyGoalTarget = weeklyGoalTarget;
       if (readAchievements !== undefined) updateData.readAchievements = readAchievements.slice(-50);
       if (readContests !== undefined) updateData.readContests = readContests.slice(-50);
@@ -102,6 +103,12 @@ export async function PUT(req) {
         await UserStats.deleteMany({ userId: decoded.id, platform: "codeforces" });
         await Submission.deleteMany({ userId: decoded.id, platform: "codeforces" });
         await TopicStat.deleteMany({ userId: decoded.id, platform: "codeforces" });
+      }
+      if (gfgHandle === "") {
+        console.log(`Clearing GeeksforGeeks stats for unlinked user ${decoded.id}`);
+        await UserStats.deleteMany({ userId: decoded.id, platform: "geeksforgeeks" });
+        await Submission.deleteMany({ userId: decoded.id, platform: "geeksforgeeks" });
+        await TopicStat.deleteMany({ userId: decoded.id, platform: "geeksforgeeks" });
       }
 
       const user = await User.findByIdAndUpdate(
