@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Calendar as CalendarIcon, Clock, Bell, ExternalLink, Sparkles, X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 function ContestsContent() {
   const [contests, setContests] = useState([]);
@@ -11,6 +12,7 @@ function ContestsContent() {
   const [reminders, setReminders] = useState([]);
   const [now, setNow] = useState(new Date());
   const [activeModalContests, setActiveModalContests] = useState(null); // Contests to show in detail modal
+  const { accessToken } = useAuth();
 
   // Fetch contests on mount
   useEffect(() => {
@@ -47,17 +49,26 @@ function ContestsContent() {
 
   // Load reminders on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("contest_reminders");
-      if (saved) {
-        try {
-          setReminders(JSON.parse(saved));
-        } catch (e) {
-          console.error(e);
+    const fetchReminders = async () => {
+      if (!accessToken) return;
+      try {
+        const res = await fetch("/api/reminders", {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Reminders API returns array of documents with contestId
+          const mapped = data.map(r => ({ id: r.contestId }));
+          setReminders(mapped);
         }
+      } catch (e) {
+        console.error(e);
       }
-    }
-  }, []);
+    };
+    fetchReminders();
+  }, [accessToken]);
 
   // Update current time clock for countdowns
   useEffect(() => {
@@ -65,24 +76,37 @@ function ContestsContent() {
     return () => clearInterval(timer);
   }, []);
 
-  const toggleReminder = (contest) => {
-    let updated;
+  const toggleReminder = async (contest) => {
     const isSet = reminders.some(r => r.id === contest.id);
+    const prevReminders = [...reminders];
+    
+    // Optimistic UI update
     if (isSet) {
-      updated = reminders.filter(r => r.id !== contest.id);
+      setReminders(reminders.filter(r => r.id !== contest.id));
     } else {
-      updated = [...reminders, {
-        id: contest.id,
-        name: contest.name,
-        platform: contest.platform,
-        start: contest.start,
-        timing: "1 hour before",
-        status: "Scheduled"
-      }];
+      setReminders([...reminders, { id: contest.id }]);
     }
-    setReminders(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("contest_reminders", JSON.stringify(updated));
+
+    try {
+      if (isSet) {
+        await fetch(`/api/reminders?contestId=${contest.id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${accessToken}` }
+        });
+      } else {
+        await fetch("/api/reminders", {
+          method: "POST",
+          headers: { 
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ contestId: contest.id })
+        });
+      }
+    } catch (err) {
+      console.error("Failed to toggle reminder:", err);
+      // Revert on failure
+      setReminders(prevReminders);
     }
   };
 

@@ -33,7 +33,7 @@ function DashboardContent() {
   
   // Timers and interactive states
   const [timeNow, setTimeNow] = useState(null);
-  const [reminders, setReminders] = useState({ cf: false, lc: false });
+  const [reminders, setReminders] = useState([]);
 
   // Initialize timeNow on client
   useEffect(() => {
@@ -43,6 +43,27 @@ function DashboardContent() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch reminders
+  useEffect(() => {
+    const fetchReminders = async () => {
+      if (!user?._id) return;
+      try {
+        const res = await fetch("/api/reminders", {
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("accessToken")}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setReminders(data.map(r => r.contestId));
+        }
+      } catch (err) {
+        console.error("Failed to load reminders", err);
+      }
+    };
+    fetchReminders();
+  }, [user]);
 
   // 2. Fetch User Stats, Submissions, and Topics once we have user ID
   useEffect(() => {
@@ -142,8 +163,40 @@ function DashboardContent() {
   };
 
   // Toggle local reminders
-  const toggleReminder = (platform) => {
-    setReminders((prev) => ({ ...prev, [platform]: !prev[platform] }));
+  const toggleReminder = async (contest) => {
+    if (!contest?._id && !contest?.slug) return;
+    const contestId = contest._id || contest.id; // API requires contestId
+
+    const isSet = reminders.includes(contestId);
+    const prev = [...reminders];
+    
+    // Optimistic UI
+    if (isSet) {
+      setReminders(reminders.filter(id => id !== contestId));
+    } else {
+      setReminders([...reminders, contestId]);
+    }
+
+    try {
+      if (isSet) {
+        await fetch(`/api/reminders?contestId=${contestId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${localStorage.getItem("accessToken")}` }
+        });
+      } else {
+        await fetch("/api/reminders", {
+          method: "POST",
+          headers: { 
+            "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ contestId })
+        });
+      }
+    } catch (err) {
+      console.error("Reminder toggle failed:", err);
+      setReminders(prev);
+    }
   };
 
   // Filter data based on whether handles are currently connected/linked
@@ -547,12 +600,12 @@ function DashboardContent() {
                       {formatCountdown(upcomingCF.startTime)}
                     </span>
                     <button
-                      className={`btn btn-sm ${reminders.cf ? "btn-primary" : "btn-secondary"}`}
+                      className={`btn btn-sm ${reminders.includes(upcomingCF._id || upcomingCF.id) ? "btn-primary" : "btn-secondary"}`}
                       style={{ padding: "0.25rem 0.5rem", fontSize: "0.65rem" }}
-                      onClick={() => toggleReminder("cf")}
+                      onClick={() => toggleReminder(upcomingCF)}
                     >
                       <Bell size={10} />
-                      <span>{reminders.cf ? "Reminder Set" : "Set Alert"}</span>
+                      <span>{reminders.includes(upcomingCF._id || upcomingCF.id) ? "Reminder Set" : "Set Alert"}</span>
                     </button>
                   </div>
                 </div>
@@ -576,12 +629,12 @@ function DashboardContent() {
                       {formatCountdown(upcomingLC.startTime)}
                     </span>
                     <button
-                      className={`btn btn-sm ${reminders.lc ? "btn-primary" : "btn-secondary"}`}
+                      className={`btn btn-sm ${reminders.includes(upcomingLC._id || upcomingLC.id) ? "btn-primary" : "btn-secondary"}`}
                       style={{ padding: "0.25rem 0.5rem", fontSize: "0.65rem" }}
-                      onClick={() => toggleReminder("lc")}
+                      onClick={() => toggleReminder(upcomingLC)}
                     >
                       <Bell size={10} />
-                      <span>{reminders.lc ? "Reminder Set" : "Set Alert"}</span>
+                      <span>{reminders.includes(upcomingLC._id || upcomingLC.id) ? "Reminder Set" : "Set Alert"}</span>
                     </button>
                   </div>
                 </div>
