@@ -1,6 +1,6 @@
 // Base URL for the Python FastAPI AI service.
 // Override with AI_SERVICE_URL env var in production.
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://127.0.0.1:8000";
+const AI_SERVICE_URL = (process.env.AI_SERVICE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 // Generates a mock card dynamically in case of API failure or missing keys
 const generateHeuristicCard = (title, difficulty, tags, patternUsed = "") => {

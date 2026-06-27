@@ -4,7 +4,7 @@ import UserStats from "@/lib/models/UserStats";
 import TopicStat from "@/lib/models/TopicStat";
 import RevisionItem from "@/lib/models/RevisionItem";
 
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://127.0.0.1:8000";
+const AI_SERVICE_URL = (process.env.AI_SERVICE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 /**
  * POST /api/mentor/chat
