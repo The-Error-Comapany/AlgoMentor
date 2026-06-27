@@ -62,7 +62,7 @@ export async function POST(req) {
     });
 
     // Trigger background contest sync on login (fire-and-forget)
-    syncGlobalContests(new Request("http://localhost/api/sync/global", { method: "POST" })).catch((err) =>
+    syncGlobalContests(new Request(new URL("/api/sync/global", req.url), { method: "POST" })).catch((err) =>
       console.error("Background sync on login failed:", err)
     );
 
